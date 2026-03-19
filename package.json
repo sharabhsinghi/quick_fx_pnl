@@ -10,10 +10,10 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "next dev",
     "lint": "next lint",
-    "predeploy": "next build",
-    "deploy": "gh-pages -d out"
+    "predeploy": "next build && touch out/.nojekyll",
+    "deploy": "gh-pages -d out --dotfiles"
   },
   "devDependencies": {
     "gh-pages": "^6.0.0"
