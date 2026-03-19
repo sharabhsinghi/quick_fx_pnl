@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quick FX P&amp;L Tracker</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>⚡ Quick FX P&amp;L</h1>
+    <p class="subtitle">Real-time Forex Trade Profit &amp; Loss Tracker</p>
+  </header>
+
+  <main class="container">
+    <!-- Trade Setup Card -->
+    <section class="card" id="setup-card">
+      <h2>Trade Setup</h2>
+      <div class="form-grid">
+        <div class="field">
+          <label for="pair">Currency Pair</label>
+          <input id="pair" type="text" placeholder="e.g. EURUSD" maxlength="6" />
+        </div>
+
+        <div class="field">
+          <label>Direction</label>
+          <div class="radio-group">
+            <label class="radio-label buy">
+              <input type="radio" name="direction" value="buy" checked /> BUY
+            </label>
+            <label class="radio-label sell">
+              <input type="radio" name="direction" value="sell" /> SELL
+            </label>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="entry-price">Entry Price</label>
+          <input id="entry-price" type="number" step="any" placeholder="0.00000" />
+        </div>
+
+        <div class="field">
+          <label for="lot-size">Units (Lot Size)</label>
+          <input id="lot-size" type="number" step="any" placeholder="100000" />
+        </div>
+
+        <div class="field">
+          <label for="stop-loss">Stop Loss</label>
+          <input id="stop-loss" type="number" step="any" placeholder="0.00000" />
+        </div>
+
+        <div class="field">
+          <label for="take-profit">Take Profit</label>
+          <input id="take-profit" type="number" step="any" placeholder="0.00000" />
+        </div>
+
+        <div class="field full-width">
+          <label for="account-size">Account Size (USD)</label>
+          <input id="account-size" type="number" step="any" placeholder="10000" />
+        </div>
+      </div>
+
+      <div class="setup-error" id="setup-error"></div>
+      <button class="btn btn-primary" id="set-trade-btn">▶ Set Trade</button>
+    </section>
+
+    <!-- Trade Status Card (hidden until trade is set) -->
+    <section class="card" id="status-card" hidden>
+      <div class="status-header">
+        <h2 id="status-pair-label">EUR/USD · BUY</h2>
+        <span class="poll-badge" id="poll-badge">● Live</span>
+      </div>
+
+      <div class="price-row">
+        <div class="price-block">
+          <span class="price-label">Entry Price</span>
+          <span class="price-value" id="disp-entry">—</span>
+        </div>
+        <div class="price-block highlight">
+          <span class="price-label">Current Price</span>
+          <span class="price-value" id="disp-current">—</span>
+        </div>
+        <div class="price-block">
+          <span class="price-label">Stop Loss</span>
+          <span class="price-value sl" id="disp-sl">—</span>
+        </div>
+        <div class="price-block">
+          <span class="price-label">Take Profit</span>
+          <span class="price-value tp" id="disp-tp">—</span>
+        </div>
+      </div>
+
+      <!-- P&L Panel -->
+      <div class="pnl-panel" id="pnl-panel">
+        <div class="pnl-main" id="pnl-main">—</div>
+        <div class="pnl-sub">
+          <span id="pnl-pips">— pips</span>
+          &nbsp;|&nbsp;
+          <span id="pnl-pct">—% of account</span>
+        </div>
+        <div class="risk-bars">
+          <div class="bar-row">
+            <span class="bar-label">SL</span>
+            <div class="bar-track">
+              <div class="bar-fill sl-fill" id="sl-bar" style="width:0%"></div>
+            </div>
+            <span class="bar-dist" id="sl-dist">—</span>
+          </div>
+          <div class="bar-row">
+            <span class="bar-label">TP</span>
+            <div class="bar-track">
+              <div class="bar-fill tp-fill" id="tp-bar" style="width:0%"></div>
+            </div>
+            <span class="bar-dist" id="tp-dist">—</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="status-footer">
+        <span id="last-updated">Last updated: —</span>
+        <span id="api-error" class="api-error"></span>
+      </div>
+
+      <div class="button-row">
+        <button class="btn btn-refresh" id="refresh-btn">↻ Refresh</button>
+        <button class="btn btn-danger" id="close-btn">✕ Close Trade</button>
+        <button class="btn btn-secondary" id="new-trade-btn">＋ New Trade</button>
+      </div>
+    </section>
+
+    <!-- Closed Trade Summary (shown after closing) -->
+    <section class="card" id="closed-card" hidden>
+      <h2>Trade Closed</h2>
+      <div class="closed-summary">
+        <div class="closed-row">
+          <span class="closed-label">Pair</span>
+          <span id="closed-pair">—</span>
+        </div>
+        <div class="closed-row">
+          <span class="closed-label">Direction</span>
+          <span id="closed-dir">—</span>
+        </div>
+        <div class="closed-row">
+          <span class="closed-label">Entry Price</span>
+          <span id="closed-entry">—</span>
+        </div>
+        <div class="closed-row">
+          <span class="closed-label">Close Price</span>
+          <span id="closed-exit">—</span>
+        </div>
+        <div class="closed-row">
+          <span class="closed-label">Units</span>
+          <span id="closed-units">—</span>
+        </div>
+        <div class="closed-row large">
+          <span class="closed-label">Final P&amp;L</span>
+          <span id="closed-pnl">—</span>
+        </div>
+        <div class="closed-row">
+          <span class="closed-label">Pips</span>
+          <span id="closed-pips">—</span>
+        </div>
+        <div class="closed-row">
+          <span class="closed-label">Account Impact</span>
+          <span id="closed-pct">—</span>
+        </div>
+      </div>
+      <button class="btn btn-primary" id="new-trade-btn-2">＋ Start New Trade</button>
+    </section>
+  </main>
+
+  <footer>
+    <p>Prices sourced from <a href="https://www.frankfurter.app/" target="_blank" rel="noopener noreferrer">Frankfurter (ECB data)</a> · Polled every 60 s</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
