@@ -1,6 +1,4 @@
-const BASE_URL = 'https://api.twelvedata.com/exchange_rate'
-const TWELVE_API = process.env.REACT_APP_TWELVE_API_KEY;
-const FALLBACK_URL = 'https://api.frankfurter.app';
+
 
 export const PAIR_META = {
   EURUSD: { base: 'EUR', quote: 'USD', pipSize: 0.0001, display: 'EUR/USD' },
@@ -44,24 +42,12 @@ export function getSupportedPairs() {
 export async function fetchLivePrice(pairKey) {
   const meta = PAIR_META[pairKey];
   if (!meta) throw new Error(`Unsupported pair: ${pairKey}`);
-  try {
-    const res = await fetch(`${BASE_URL}?apikey=${TWELVE_API}&symbol=${meta.display}`, { signal: AbortSignal.timeout(8000) });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    const price = data?.rate;
-    if (!price) throw new Error('Price not in response');
-    return { price, source: 'myfxbook.com', date: new Date().toISOString().split('T')[0] };
-  } catch (_) {}
-  try {
-    const res = await fetch(`${FALLBACK_URL}/latest?from=${meta.base}&to=${meta.quote}`, { signal: AbortSignal.timeout(8000) });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    const rate = data.rates?.[meta.quote];
-    if (!rate) throw new Error('Rate not in response');
-    return { price: rate, source: 'frankfurter.app (ECB)', date: data.date };
-  } catch (err) {
-    throw new Error(`Price feed unavailable. Check your connection.`);
-  }
+  const res = await fetch(`/api/price?pair=${encodeURIComponent(pairKey)}`, {
+    signal: AbortSignal.timeout(10000),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return { price: data.price, source: data.source, date: data.date };
 }
 
 export function calcPnL({ entry, currentPrice, side, lotSize, pipSize }) {
@@ -83,7 +69,7 @@ export function calcRR({ entry, sl, tp, side }) {
 }
 
 export function formatPrice(price, pipSize) {
-  const decimals = pipSize <= 0.001 ? 3 : 5;
+  const decimals = 5; // pipSize <= 0.001 ? 3 : 5;
   return price.toFixed(decimals);
 }
 

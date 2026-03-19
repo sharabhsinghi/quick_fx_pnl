@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { normalizePair, getPairMeta, getSupportedPairs } from '../priceService';
-import './TradeForm.css';
 
 const POPULAR_PAIRS = ['EUR/USD', 'GBP/USD', 'USD/JPY', 'AUD/USD', 'USD/CHF', 'EUR/GBP', 'GBP/JPY', 'EUR/JPY'];
 

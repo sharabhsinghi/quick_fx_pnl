@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react';
 import { PAIR_META, normalizePair, calcPipValue } from '../priceService';
-import './PipCalculator.css';
 
 const POPULAR = ['EUR/USD','GBP/USD','USD/JPY','AUD/USD','USD/CHF','EUR/GBP','GBP/JPY','EUR/JPY'];
 

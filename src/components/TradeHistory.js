@@ -1,6 +1,5 @@
 import React, { useMemo } from 'react';
 import { formatPrice } from '../priceService';
-import './TradeHistory.css';
 
 export default function TradeHistory({ history, onClear }) {
   const stats = useMemo(() => {

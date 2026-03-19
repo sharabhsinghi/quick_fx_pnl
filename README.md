@@ -1,137 +1,87 @@
 # FX Tracker — Forex Trade P/L Tracker
 
-A React app to track forex trade profit/loss in real time. Prices are fetched from TwelveData.
+A Next.js app to track forex trade profit/loss in real time. Live prices are fetched server-side so your API key is never exposed in the browser.
 
 ## Features
 
 - Enter currency pair, direction (buy/sell), entry, SL, TP, and lot size
-- Fetch live FX prices with the Refresh button
-- Visual price bar showing current price relative to SL/TP/Entry
+- Fetch live FX prices with the Refresh button or set auto-refresh (30s / 1m / 5m)
+- Visual price bar showing current price relative to SL / Entry / TP
 - P/L calculated in pips and USD
 - Risk:Reward ratio display
-- Close trade with final summary
+- Trade journal with win rate, total P/L, and per-trade history
+- Pip calculator with scenario table
+- Close trade with final P/L summary
 
 ## Supported Pairs
 
-EUR/USD · GBP/USD · USD/JPY · USD/CHF · AUD/USD · NZD/USD · USD/CAD · EUR/GBP · EUR/JPY · GBP/JPY · EUR/CHF · GBP/CHF · AUD/JPY · CAD/JPY · EUR/AUD · EUR/CAD · GBP/AUD · GBP/CAD · AUD/CAD · AUD/CHF · NZD/JPY · USD/SGD · USD/MXN · USD/HKD · USD/CNH
+EUR/USD · GBP/USD · USD/JPY · USD/CHF · AUD/USD · NZD/USD · USD/CAD · EUR/GBP · EUR/JPY · GBP/JPY · EUR/CHF · GBP/CHF · AUD/JPY · CAD/JPY · EUR/AUD · EUR/CAD · GBP/AUD · GBP/CAD · AUD/CAD · AUD/CHF · NZD/JPY · USD/SGD · USD/MXN · USD/HKD
 
-> **Note:** The free frankfurter.app API is backed by ECB data and updates once daily on weekdays. Rates are mid-market and may differ from your broker's live bid/ask spread.
-
----
+> **Note:** The frankfurter.app fallback is backed by ECB data and updates once daily on weekdays. Rates are mid-market and may differ from your broker's live bid/ask spread.
 
 ## Getting Started
 
-### 1. Clone or download this repo
+1. **Install dependencies**
+   ```bash
+   npm install
+   ```
 
-```bash
-git clone https://github.com/YOUR_USERNAME/quick_fx_pnl.git
-cd quick_fx_pnl
-```
+2. **Set up your API key**
+   ```bash
+   cp .env.local.example .env.local
+   # then edit .env.local and set TWELVE_API_KEY=your_key
+   ```
 
-### 2. Install dependencies
+3. **Run the development server**
+   ```bash
+   npm run dev
+   # open http://localhost:3000
+   ```
 
-```bash
-npm install
-```
+4. **Build for production**
+   ```bash
+   npm run build
+   npm start
+   ```
 
-### 3. Run locally
+## Environment Variables
 
-```bash
-npm start
-```
+| Variable | Required | Description |
+|---|---|---|
+| `TWELVE_API_KEY` | No | [TwelveData](https://twelvedata.com) API key. If omitted, prices fall back to frankfurter.app (ECB). |
 
-The app opens at `http://localhost:3000`.
-
----
-
-## Deploy to GitHub Pages
-
-### Step 1: Create a GitHub repository
-
-1. Go to [github.com](https://github.com) → **New repository**
-2. Name it `quick_fx_pnl` (or anything you like)
-3. Leave it public, don't add README yet
-4. Click **Create repository**
-
-### Step 2: Set the homepage in package.json
-
-Open `package.json` and update the `"homepage"` field to match your GitHub Pages URL:
-
-```json
-"homepage": "https://YOUR_USERNAME.github.io/quick_fx_pnl"
-```
-
-Replace `YOUR_USERNAME` with your GitHub username and `quick_fx_pnl` with your repo name.
-
-### Step 3: Push your code to GitHub
-
-```bash
-git init
-git add .
-git commit -m "Initial commit"
-git branch -M main
-git remote add origin https://github.com/YOUR_USERNAME/quick_fx_pnl.git
-git push -u origin main
-```
-
-### Step 4: Deploy
-
-```bash
-npm run deploy
-```
-
-This runs `npm run build` then pushes the build to the `gh-pages` branch automatically.
-
-### Step 5: Enable GitHub Pages
-
-1. Go to your repo on GitHub → **Settings** → **Pages**
-2. Under **Source**, select branch: `gh-pages`, folder: `/ (root)`
-3. Click **Save**
-
-Your app will be live at:
-```
-https://YOUR_USERNAME.github.io/quick_fx_pnl
-```
-
-*(It may take 1–2 minutes for the first deployment to go live.)*
-
-### Updating the app
-
-Whenever you make changes:
-
-```bash
-npm run deploy
-```
-
-That's it — it rebuilds and redeploys automatically.
-
----
+Variables are read **server-side only** and are never sent to the browser.
 
 ## Project Structure
 
 ```
-quick_fx_pnl/
+forex-tracker/
 ├── public/
 │   └── index.html
 ├── src/
+│   ├── pages/
+│   │   ├── _app.js           # Global CSS + Head metadata
+│   │   ├── index.js          # Main page (renders App)
+│   │   └── api/
+│   │       └── price.js      # Server-side price API route (keeps API key secret)
 │   ├── components/
-│   │   ├── TradeForm.js      # Trade entry form
-│   │   ├── TradeForm.css
-│   │   ├── LiveTrade.js      # Live P/L dashboard
-│   │   ├── LiveTrade.css
-│   │   ├── ClosedTrade.js    # Trade summary after closing
-│   │   └── ClosedTrade.css
-│   ├── priceService.js       # API calls + P/L calculations
-│   ├── App.js
-│   ├── App.css
-│   ├── index.js
-│   └── index.css
+│   │   ├── Dashboard.js/css  # Open positions grid
+│   │   ├── TradeCard.js/css  # Live trade card with P/L + auto-refresh
+│   │   ├── TradeForm.js/css  # New trade entry form
+│   │   ├── TradeHistory.js/css # Closed trade journal
+│   │   └── PipCalculator.js/css
+│   ├── priceService.js       # Client helpers: P/L calc, pair metadata, fetch (via /api/price)
+│   ├── App.js / App.css      # Root component and layout
+│   ├── index.js / index.css  # (legacy entry points, unused by Next.js)
 └── package.json
 ```
 
 ## Price API
-Primary: [TWELVE_API](https://api.twelvedata.com) - requires API Key
-Fallback: [frankfurter.app](https://frankfurter.app) — free, no key, ECB-backed
+
+- **Primary:** [TwelveData](https://twelvedata.com) — requires `TWELVE_API_KEY` in `.env.local`
+- **Fallback:** [frankfurter.app](https://frankfurter.app) — free, no key required, ECB-backed
+
+All API calls are made from the Next.js API route (`/api/price`), so credentials stay on the server and are never visible in the browser's network tab.
 
 ## Disclaimer
 

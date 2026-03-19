@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { fetchLivePrice, calcPnL, calcRR, formatPrice } from '../priceService';
-import './TradeCard.css';
 
 const AUTO_INTERVALS = [0, 30, 60, 300]; // seconds; 0 = off
 const INTERVAL_LABELS = ['Off', '30s', '1m', '5m'];

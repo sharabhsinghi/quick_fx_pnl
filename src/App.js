@@ -3,7 +3,6 @@ import TradeForm from './components/TradeForm';
 import Dashboard from './components/Dashboard';
 import PipCalculator from './components/PipCalculator';
 import TradeHistory from './components/TradeHistory';
-import './App.css';
 
 const TABS = ['trades', 'calculator', 'history'];
 

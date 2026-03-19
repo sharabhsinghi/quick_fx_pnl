@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import TradeCard from './TradeCard';
-import './Dashboard.css';
 
 export default function Dashboard({ trades, onAddTrade, onClose, onUpdate }) {
   const totalPL = trades.reduce((s, t) => s + (t.plUsd || 0), 0);
