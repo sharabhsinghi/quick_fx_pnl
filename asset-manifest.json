@@ -1,10 +1,10 @@
 {
   "files": {
-    "main.css": "/forex-tracker/static/css/main.323e6cfd.css",
-    "main.js": "/forex-tracker/static/js/main.2edc1059.js",
-    "index.html": "/forex-tracker/index.html",
-    "main.323e6cfd.css.map": "/forex-tracker/static/css/main.323e6cfd.css.map",
-    "main.2edc1059.js.map": "/forex-tracker/static/js/main.2edc1059.js.map"
+    "main.css": "/quick_fx_pnl/static/css/main.323e6cfd.css",
+    "main.js": "/quick_fx_pnl/static/js/main.2edc1059.js",
+    "index.html": "/quick_fx_pnl/index.html",
+    "main.323e6cfd.css.map": "/quick_fx_pnl/static/css/main.323e6cfd.css.map",
+    "main.2edc1059.js.map": "/quick_fx_pnl/static/js/main.2edc1059.js.map"
   },
   "entrypoints": [
     "static/css/main.323e6cfd.css",
