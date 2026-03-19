@@ -1,0 +1,164 @@
+.trade-card {
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+  transition: border-color 0.3s;
+  animation: fadeIn 0.3s ease;
+}
+.trade-card.card-profit { border-color: rgba(0,230,118,0.2); }
+.trade-card.card-loss   { border-color: rgba(255,68,68,0.2); }
+
+.tc-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px 0;
+}
+.tc-pair {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+.tc-side {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  padding: 2px 8px;
+  border-radius: 2px;
+}
+.tc-side.buy { background: var(--green-dim); color: var(--green); border: 1px solid rgba(0,230,118,0.25); }
+.tc-side.sell { background: var(--red-dim); color: var(--red); border: 1px solid rgba(255,68,68,0.25); }
+
+.tc-dot {
+  width: 6px; height: 6px; border-radius: 50%; margin-left: auto;
+}
+.tc-dot.live { background: var(--green); animation: pulse 2s infinite; }
+.tc-dot.loading { background: var(--amber); animation: pulse 0.5s infinite; }
+
+.tc-pl {
+  padding: 16px 16px 8px;
+  text-align: center;
+}
+.tc-pl-usd {
+  font-family: var(--font-mono);
+  font-size: 36px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.tc-pl-pips {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  margin-top: 4px;
+  opacity: 0.7;
+}
+.tc-pl.profit .tc-pl-usd { color: var(--green); }
+.tc-pl.profit .tc-pl-pips { color: var(--green); }
+.tc-pl.loss .tc-pl-usd { color: var(--red); }
+.tc-pl.loss .tc-pl-pips { color: var(--red); }
+.tc-pl.neutral .tc-pl-usd { color: var(--text-dim); }
+
+.tc-progress-track {
+  height: 2px;
+  background: var(--bg-3);
+  margin: 8px 16px;
+}
+.tc-progress-fill {
+  height: 100%;
+  transition: width 0.5s ease;
+}
+.tc-progress-fill.profit { background: var(--green); }
+.tc-progress-fill.loss { background: var(--red); }
+.tc-progress-fill.neutral { background: var(--text-dim); }
+
+.tc-levels {
+  display: flex;
+  padding: 4px 16px 8px;
+  justify-content: space-between;
+}
+.tc-level { display: flex; flex-direction: column; gap: 2px; }
+.tc-level.center { align-items: center; }
+.tc-level.right { align-items: flex-end; }
+
+.tl-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+}
+.tl-val {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+}
+.tl-val.red { color: var(--red); }
+.tl-val.green { color: var(--green); }
+
+.tc-meta {
+  display: flex;
+  gap: 6px;
+  padding: 0 16px 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  flex-wrap: wrap;
+}
+
+.tc-error {
+  margin: 0 16px 6px;
+  font-size: 10px;
+  color: var(--red);
+  font-family: var(--font-mono);
+  background: var(--red-dim);
+  padding: 4px 8px;
+  border-radius: 2px;
+}
+
+.tc-updated {
+  padding: 0 16px 6px;
+  font-size: 10px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+}
+
+.tc-actions {
+  display: flex;
+  border-top: 1px solid var(--border);
+}
+
+.tc-btn-refresh, .tc-btn-auto, .tc-btn-close, .tc-btn-confirm, .tc-btn-cancel {
+  flex: 1;
+  height: 38px;
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.tc-btn-refresh:last-child,
+.tc-btn-auto:last-child,
+.tc-btn-close:last-child { border-right: none; }
+
+.tc-btn-refresh:hover:not(:disabled) { color: var(--text); background: var(--bg-2); }
+.tc-btn-refresh:disabled { opacity: 0.4; cursor: not-allowed; }
+.tc-btn-refresh.spinning { color: var(--amber); }
+
+.tc-btn-auto { font-size: 9px; }
+.tc-btn-auto:hover { background: var(--bg-2); color: var(--text); }
+.tc-btn-auto.active { color: var(--green); }
+
+.tc-btn-close:hover { color: var(--red); background: var(--red-dim); }
+.tc-btn-close { border-right: none; }
+
+.tc-btn-confirm { color: var(--red); border-right: 1px solid var(--border); }
+.tc-btn-confirm:hover { background: var(--red-dim); }
+.tc-btn-cancel:hover { background: var(--bg-2); color: var(--text); }
+.tc-btn-cancel { border-right: none; }

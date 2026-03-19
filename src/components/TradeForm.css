@@ -1,0 +1,37 @@
+.form-wrap { display: flex; justify-content: center; padding: 2rem 1rem; animation: fadeIn 0.4s ease; }
+.form-card { width: 100%; max-width: 640px; background: var(--bg-1); border: 1px solid var(--border); border-radius: 2px; padding: 2rem; }
+.form-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
+.form-title { font-family: var(--font-mono); font-size: 13px; font-weight: 600; letter-spacing: 0.15em; color: var(--amber); }
+.form-cancel { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; background: transparent; border: 1px solid var(--border); color: var(--text-muted); padding: 4px 12px; border-radius: 2px; cursor: pointer; transition: all 0.15s; }
+.form-cancel:hover { border-color: var(--red); color: var(--red); }
+.field-group { margin-bottom: 1.25rem; }
+.field-label { display: block; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.12em; color: var(--text-muted); margin-bottom: 6px; }
+.label-hint { font-size: 10px; color: var(--text-dim); text-transform: none; letter-spacing: 0; }
+.field-input { width: 100%; height: 40px; background: var(--bg-2); border: 1px solid var(--border); border-radius: 2px; color: var(--text); font-size: 14px; padding: 0 12px; transition: border-color 0.15s; font-family: var(--font-mono); }
+.field-input:focus { border-color: var(--amber); outline: none; }
+.field-input.sl:focus { border-color: var(--red); }
+.field-input.tp:focus { border-color: var(--green); }
+.quick-pairs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.pair-chip { font-size: 11px; padding: 3px 10px; background: var(--bg-2); border: 1px solid var(--border); color: var(--text-muted); border-radius: 2px; font-family: var(--font-mono); letter-spacing: 0.04em; transition: all 0.15s; cursor: pointer; }
+.pair-chip:hover { border-color: var(--border-hover); color: var(--text); }
+.pair-chip.active { border-color: var(--amber); color: var(--amber); background: var(--amber-dim); }
+.side-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.side-btn { height: 40px; background: var(--bg-2); border: 1px solid var(--border); color: var(--text-muted); font-size: 12px; letter-spacing: 0.08em; border-radius: 2px; transition: all 0.15s; cursor: pointer; font-family: var(--font-mono); }
+.side-btn:hover { border-color: var(--border-hover); color: var(--text); }
+.side-btn.buy.active { border-color: var(--green); color: var(--green); background: var(--green-dim); }
+.side-btn.sell.active { border-color: var(--red); color: var(--red); background: var(--red-dim); }
+.fields-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+@media (max-width: 500px) { .fields-row { grid-template-columns: 1fr; } }
+.lot-row { display: flex; gap: 8px; align-items: center; }
+.lot-row .field-input { flex: 1; }
+.lot-presets { display: flex; gap: 6px; }
+.lot-chip { height: 40px; padding: 0 10px; font-size: 11px; background: var(--bg-2); border: 1px solid var(--border); color: var(--text-muted); border-radius: 2px; font-family: var(--font-mono); transition: all 0.15s; white-space: nowrap; cursor: pointer; }
+.lot-chip:hover { border-color: var(--border-hover); color: var(--text); }
+.lot-chip.active { border-color: var(--amber); color: var(--amber); background: var(--amber-dim); }
+.form-error { font-size: 12px; color: var(--red); background: var(--red-dim); border: 1px solid rgba(255,68,68,0.2); border-radius: 2px; padding: 8px 12px; margin-bottom: 1rem; font-family: var(--font-mono); }
+.open-btn { width: 100%; height: 44px; background: var(--amber); color: #000; font-size: 13px; font-weight: 600; letter-spacing: 0.1em; border-radius: 2px; transition: all 0.15s; cursor: pointer; font-family: var(--font-mono); border: none; }
+.open-btn:hover { opacity: 0.88; transform: translateY(-1px); }
+.open-btn:active { transform: scale(0.99); }
+.supported-pairs { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border); font-size: 11px; color: var(--text-dim); line-height: 1.8; }
+.sp-label { color: var(--text-muted); font-family: var(--font-mono); }
+.sp-list { font-family: var(--font-mono); letter-spacing: 0.02em; }
