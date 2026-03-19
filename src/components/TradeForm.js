@@ -82,7 +82,7 @@ export default function TradeForm({ onOpen, onCancel }) {
             <div className="lot-row">
               <input className="field-input" type="number" step="1" value={lotSize} onChange={e=>setLotSize(e.target.value)} placeholder="100000" />
               <div className="lot-presets">
-                {[['0.01','1000'],['0.1','10000'],['1','100000'],['2','200000']].map(([l,v])=>(
+                {[['0.01','1000'],['0.05','5000'],['0.1','10000'],['1','100000']].map(([l,v])=>(
                   <button key={l} type="button" className={`lot-chip ${lotSize===v?'active':''}`} onClick={()=>setLotSize(v)}>{l}L</button>
                 ))}
               </div>

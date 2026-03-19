@@ -24,8 +24,8 @@ EUR/USD · GBP/USD · USD/JPY · USD/CHF · AUD/USD · NZD/USD · USD/CAD · EUR
 ### 1. Clone or download this repo
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/forex-tracker.git
-cd forex-tracker
+git clone https://github.com/YOUR_USERNAME/quick_fx_pnl.git
+cd quick_fx_pnl
 ```
 
 ### 2. Install dependencies
@@ -49,7 +49,7 @@ The app opens at `http://localhost:3000`.
 ### Step 1: Create a GitHub repository
 
 1. Go to [github.com](https://github.com) → **New repository**
-2. Name it `forex-tracker` (or anything you like)
+2. Name it `quick_fx_pnl` (or anything you like)
 3. Leave it public, don't add README yet
 4. Click **Create repository**
 
@@ -58,10 +58,10 @@ The app opens at `http://localhost:3000`.
 Open `package.json` and update the `"homepage"` field to match your GitHub Pages URL:
 
 ```json
-"homepage": "https://YOUR_USERNAME.github.io/forex-tracker"
+"homepage": "https://YOUR_USERNAME.github.io/quick_fx_pnl"
 ```
 
-Replace `YOUR_USERNAME` with your GitHub username and `forex-tracker` with your repo name.
+Replace `YOUR_USERNAME` with your GitHub username and `quick_fx_pnl` with your repo name.
 
 ### Step 3: Push your code to GitHub
 
@@ -70,7 +70,7 @@ git init
 git add .
 git commit -m "Initial commit"
 git branch -M main
-git remote add origin https://github.com/YOUR_USERNAME/forex-tracker.git
+git remote add origin https://github.com/YOUR_USERNAME/quick_fx_pnl.git
 git push -u origin main
 ```
 
@@ -90,7 +90,7 @@ This runs `npm run build` then pushes the build to the `gh-pages` branch automat
 
 Your app will be live at:
 ```
-https://YOUR_USERNAME.github.io/forex-tracker
+https://YOUR_USERNAME.github.io/quick_fx_pnl
 ```
 
 *(It may take 1–2 minutes for the first deployment to go live.)*
@@ -110,7 +110,7 @@ That's it — it rebuilds and redeploys automatically.
 ## Project Structure
 
 ```
-forex-tracker/
+quick_fx_pnl/
 ├── public/
 │   └── index.html
 ├── src/
@@ -130,9 +130,8 @@ forex-tracker/
 ```
 
 ## Price API
-
-Primary: [frankfurter.app](https://frankfurter.app) — free, no key, ECB-backed  
-Fallback: [open.er-api.com](https://open.er-api.com) — free, no key
+Primary: [TWELVE_API](https://api.twelvedata.com) - requires API Key
+Fallback: [frankfurter.app](https://frankfurter.app) — free, no key, ECB-backed
 
 ## Disclaimer
 

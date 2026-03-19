@@ -1,8 +1,8 @@
 {
-  "name": "forex-tracker",
+  "name": "quick_fx_pnl",
   "version": "1.0.0",
   "private": true,
-  "homepage": "https://sharabhsinghi.github.io/forex-tracker",
+  "homepage": "https://sharabhsinghi.github.io/quick_fx_pnl",
   "dependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
