@@ -1,6 +1,6 @@
 # FX Tracker — Forex Trade P/L Tracker
 
-A React app to track forex trade profit/loss in real time. Prices are fetched from [frankfurter.app](https://frankfurter.app) (European Central Bank data) — **no API key required**.
+A React app to track forex trade profit/loss in real time. Prices are fetched from TwelveData.
 
 ## Features
 
