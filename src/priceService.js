@@ -39,15 +39,32 @@ export function getSupportedPairs() {
   return Object.values(PAIR_META).map(p => p.display);
 }
 
+const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || '';
+
 export async function fetchLivePrice(pairKey) {
   const meta = PAIR_META[pairKey];
   if (!meta) throw new Error(`Unsupported pair: ${pairKey}`);
-  const res = await fetch(`/api/price?pair=${encodeURIComponent(pairKey)}`, {
-    signal: AbortSignal.timeout(10000),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-  return { price: data.price, source: data.source, date: data.date };
+  // Try the server-side API route first (works when running as a Node.js server with an API key)
+  try {
+    const res = await fetch(`${BASE_PATH}/api/price?pair=${encodeURIComponent(pairKey)}`, {
+      signal: AbortSignal.timeout(10000),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return { price: data.price, source: data.source, date: data.date };
+    }
+  } catch (_) {}
+  // Fallback: call frankfurter.app directly from the browser.
+  // Used in static deployments (GitHub Pages) where API routes don't exist.
+  const r = await fetch(
+    `https://api.frankfurter.app/latest?from=${meta.base}&to=${meta.quote}`,
+    { signal: AbortSignal.timeout(8000) }
+  );
+  if (!r.ok) throw new Error('Price feed unavailable. Check your connection.');
+  const data = await r.json();
+  const rate = data.rates?.[meta.quote];
+  if (!rate) throw new Error('Rate not in response');
+  return { price: rate, source: 'frankfurter.app (ECB)', date: data.date };
 }
 
 export function calcPnL({ entry, currentPrice, side, lotSize, pipSize }) {
