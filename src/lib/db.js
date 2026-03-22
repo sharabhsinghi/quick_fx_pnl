@@ -18,7 +18,8 @@ export function getDb() {
         tp       REAL    NOT NULL,
         lotSize  REAL    NOT NULL,
         openedAt TEXT    NOT NULL,
-        meta     TEXT    NOT NULL
+        meta     TEXT    NOT NULL,
+        notes    TEXT    NOT NULL DEFAULT ''
       );
 
       CREATE TABLE IF NOT EXISTS history (
@@ -38,8 +39,9 @@ export function getDb() {
         notes      TEXT    NOT NULL DEFAULT ''
       );
     `);
-    // Migration: add notes column to existing DBs that predate this column
+    // Migrations: add columns to existing DBs that predate them
     try { db.exec(`ALTER TABLE history ADD COLUMN notes TEXT NOT NULL DEFAULT ''`); } catch (_) {}
+    try { db.exec(`ALTER TABLE trades  ADD COLUMN notes TEXT NOT NULL DEFAULT ''`); } catch (_) {}
   }
   return db;
 }

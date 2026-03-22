@@ -137,6 +137,7 @@ export default function TradeCard({ trade, onClose, onUpdate }) {
       </div>
 
       {trade.error && <div className="tc-error">⚠ {trade.error}</div>}
+      {trade.notes && <div className="tc-notes">{trade.notes}</div>}
       {trade.lastUpdated && (
         <div className="tc-updated">Updated {trade.lastUpdated.toLocaleTimeString()}</div>
       )}

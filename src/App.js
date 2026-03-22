@@ -46,6 +46,7 @@ export default function App() {
           tp: tradeData.tp,
           lotSize: tradeData.lotSize,
           openedAt,
+          notes: tradeData.notes || '',
         }),
       });
       if (res.ok) {

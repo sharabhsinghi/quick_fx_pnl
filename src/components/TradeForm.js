@@ -22,6 +22,7 @@ export default function TradeForm({ onOpen, onCancel }) {
   const [sl, setSl] = useState('');
   const [tp, setTp] = useState('');
   const [lotSize, setLotSize] = useState('100000');
+  const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
   const [priceLoading, setPriceLoading] = useState(false);
   // Track if user manually edited SL or TP; reset when entry is (re)autofilled
@@ -86,7 +87,7 @@ export default function TradeForm({ onOpen, onCancel }) {
     if (side === 'buy' && tpN <= entryN) { setError('BUY: Take Profit must be above Entry.'); return; }
     if (side === 'sell' && slN <= entryN) { setError('SELL: Stop Loss must be above Entry.'); return; }
     if (side === 'sell' && tpN >= entryN) { setError('SELL: Take Profit must be below Entry.'); return; }
-    onOpen({ key, meta, side, entry: entryN, sl: slN, tp: tpN, lotSize: lotN });
+    onOpen({ key, meta, side, entry: entryN, sl: slN, tp: tpN, lotSize: lotN, notes });
   };
 
   return (
@@ -157,6 +158,17 @@ export default function TradeForm({ onOpen, onCancel }) {
                 ))}
               </div>
             </div>
+          </div>
+
+          <div className="field-group">
+            <label className="field-label">OPENING NOTES <span className="label-hint">optional</span></label>
+            <textarea
+              className="field-input field-textarea"
+              placeholder="Trade rationale, setup notes…"
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              rows={3}
+            />
           </div>
 
           {error && <div className="form-error">⚠ {error}</div>}

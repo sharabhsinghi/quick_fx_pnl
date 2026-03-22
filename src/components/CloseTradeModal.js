@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react';
 import { calcPnL, formatPrice } from '../priceService';
-import './CloseTradeModal.css';
 
 function defaultClosePrice(trade) {
   const dec = trade.meta.pipSize <= 0.001 ? 3 : 5;

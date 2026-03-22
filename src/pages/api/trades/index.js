@@ -19,17 +19,17 @@ export default function handler(req, res) {
   }
 
   if (req.method === 'POST') {
-    const { key, meta, side, entry, sl, tp, lotSize, openedAt } = req.body;
+    const { key, meta, side, entry, sl, tp, lotSize, openedAt, notes } = req.body;
     if (!key || !meta || !side || entry == null || sl == null || tp == null || lotSize == null || !openedAt) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
     const stmt = db.prepare(
-      'INSERT INTO trades (key, side, entry, sl, tp, lotSize, openedAt, meta) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+      'INSERT INTO trades (key, side, entry, sl, tp, lotSize, openedAt, meta, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
     );
     const result = stmt.run(
       String(key), String(side),
       Number(entry), Number(sl), Number(tp), Number(lotSize),
-      String(openedAt), JSON.stringify(meta)
+      String(openedAt), JSON.stringify(meta), String(notes || '')
     );
     return res.status(201).json({ id: Number(result.lastInsertRowid) });
   }

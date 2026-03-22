@@ -6,6 +6,7 @@ import '../components/PipCalculator.css';
 import '../components/TradeCard.css';
 import '../components/TradeForm.css';
 import '../components/TradeHistory.css';
+import '../components/CloseTradeModal.css';
 
 export default function MyApp({ Component, pageProps }) {
   return (
