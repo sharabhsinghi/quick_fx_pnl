@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { formatPrice, formatPL } from '../priceService';
 
-export default function TradeHistory({ history, onClear, accountCurrency = 'USD', accountSize = 0, usdRate = 1 }) {
+export default function TradeHistory({ history, onClear, onDelete, accountCurrency = 'USD', accountSize = 0, usdRate = 1 }) {
   const stats = useMemo(() => {
     if (!history.length) return null;
     const wins = history.filter(t => t.plUsd >= 0).length;
@@ -81,6 +81,7 @@ export default function TradeHistory({ history, onClear, accountCurrency = 'USD'
               <span>PIPS</span>
               <span>P/L {accountCurrency}</span>
               <span>CLOSED</span>
+              <span></span>
             </div>
             {history.map((t, i) => {
               const won = t.plUsd >= 0;
@@ -100,6 +101,11 @@ export default function TradeHistory({ history, onClear, accountCurrency = 'USD'
                       {t.plUsd * usdRate >= 0 ? '+' : '-'}{formatPL(t.plUsd * usdRate, accountCurrency)}
                     </span>
                     <span className="ht-time">{fmt(t.closedAt)}</span>
+                    <button
+                      className="ht-delete-btn"
+                      onClick={() => onDelete && onDelete(t.id)}
+                      title="Delete trade"
+                    >✕</button>
                   </div>
                   {t.notes && (
                     <div className="ht-notes">

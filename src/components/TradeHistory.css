@@ -28,12 +28,12 @@
 
 .history-table { overflow-x: auto; }
 .ht-head {
-  display: grid; grid-template-columns: 90px 80px 100px 100px 80px 90px 1fr;
+  display: grid; grid-template-columns: 90px 80px 100px 100px 80px 90px 1fr 32px;
   padding: 10px 16px; border-bottom: 1px solid var(--border);
   font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.12em; color: var(--text-muted);
 }
 .ht-row {
-  display: grid; grid-template-columns: 90px 80px 100px 100px 80px 90px 1fr;
+  display: grid; grid-template-columns: 90px 80px 100px 100px 80px 90px 1fr 32px;
   padding: 10px 16px; border-bottom: 1px solid var(--border);
   align-items: center; transition: background 0.1s;
 }
@@ -51,6 +51,21 @@
 .ht-pips.profit, .ht-pl.profit { color: var(--green); }
 .ht-pips.loss, .ht-pl.loss { color: var(--red); }
 .ht-time { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); }
+
+.ht-delete-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-size: 11px;
+  padding: 2px 4px;
+  border-radius: 3px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s, background 0.15s;
+  line-height: 1;
+}
+.ht-row:hover .ht-delete-btn { opacity: 1; }
+.ht-delete-btn:hover { color: var(--red); background: var(--red-dim); }
 
 .ht-notes {
   display: flex;

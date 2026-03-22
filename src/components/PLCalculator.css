@@ -1,0 +1,231 @@
+.plc-wrap { display: flex; justify-content: center; padding: 0 1rem 4rem; }
+.plc-card {
+  width: 100%;
+  max-width: 760px;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  animation: fadeIn 0.3s ease;
+}
+
+.plc-header {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+.plc-title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  color: var(--amber);
+}
+
+/* Sections */
+.plc-section {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+.plc-row3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-bottom: 1px solid var(--border);
+}
+.plc-field {
+  padding: 1.25rem 1.5rem;
+  border-right: 1px solid var(--border);
+}
+.plc-field:last-child { border-right: none; }
+
+.plc-label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.13em;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.plc-label-hint { color: var(--text-dim); font-style: italic; }
+.plc-hint { color: var(--text-dim); font-style: italic; }
+.plc-error { font-family: var(--font-mono); font-size: 10px; color: var(--red); margin-top: 4px; }
+
+.plc-input {
+  width: 100%;
+  height: 38px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  padding: 0 12px;
+  margin-top: 4px;
+  transition: border-color 0.15s;
+}
+.plc-input:focus { outline: none; border-color: var(--amber); }
+.plc-input.plc-sl:focus { border-color: var(--red); }
+.plc-input.plc-tp:focus { border-color: var(--green); }
+
+.plc-select {
+  width: 100%;
+  height: 38px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 0 10px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.plc-select:focus { outline: none; border-color: var(--amber); }
+
+.plc-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.plc-chip {
+  font-size: 11px; padding: 3px 9px;
+  background: var(--bg-2); border: 1px solid var(--border);
+  color: var(--text-muted); border-radius: 2px;
+  font-family: var(--font-mono); cursor: pointer;
+  transition: all 0.15s;
+}
+.plc-chip:hover { border-color: var(--border-hover); color: var(--text); }
+.plc-chip.active { border-color: var(--amber); color: var(--amber); background: var(--amber-dim); }
+
+.plc-side-toggle { display: flex; gap: 8px; }
+.plc-side {
+  flex: 1; height: 40px;
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em;
+  background: var(--bg-2); border: 1px solid var(--border);
+  color: var(--text-muted); border-radius: 3px;
+  cursor: pointer; transition: all 0.15s;
+}
+.plc-side.buy.active  { border-color: var(--green); color: var(--green); background: var(--green-dim); }
+.plc-side.sell.active { border-color: var(--red);   color: var(--red);   background: var(--red-dim);   }
+
+.plc-lot-row { display: flex; flex-direction: column; gap: 8px; }
+.plc-lot-input { max-width: 220px; }
+
+/* ── Results ── */
+.plc-results { border-top: 1px solid var(--border); }
+
+.plc-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-bottom: 1px solid var(--border);
+}
+.plc-sum-card {
+  padding: 1.5rem 1.5rem 1.25rem;
+  border-right: 1px solid var(--border);
+  text-align: center;
+}
+.plc-sum-card:last-child { border-right: none; }
+.plc-sum-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.13em;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+.plc-sum-pl {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.plc-sum-card.loss  .plc-sum-pl { color: var(--red); }
+.plc-sum-card.profit .plc-sum-pl { color: var(--green); }
+.plc-sum-pl.plc-rr { color: var(--amber); }
+.plc-sum-sub {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+/* ── Scenario table ── */
+.plc-scenarios { padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border); }
+.plc-sc-title {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.13em;
+  color: var(--text-dim);
+  margin-bottom: 10px;
+}
+.plc-sc-head {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+.plc-sc-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 8px 10px;
+  border-radius: 3px;
+  align-items: center;
+  transition: background 0.1s;
+}
+.plc-sc-row:hover { background: var(--bg-2); }
+.plc-sc-row.sl-row    { background: var(--red-dim); }
+.plc-sc-row.tp-row    { background: var(--green-dim); }
+.plc-sc-row.entry-row { background: var(--bg-2); }
+.plc-sc-price { display: flex; align-items: center; gap: 6px; font-weight: 500; color: var(--text); }
+
+.plc-tag {
+  font-size: 8px;
+  padding: 1px 5px;
+  border-radius: 2px;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+}
+.plc-tag-sl    { background: var(--red-dim);   color: var(--red);   border: 1px solid var(--red); }
+.plc-tag-tp    { background: var(--green-dim); color: var(--green); border: 1px solid var(--green); }
+.plc-tag-entry { background: var(--bg-3);      color: var(--text-muted); border: 1px solid var(--border); }
+
+.profit { color: var(--green); }
+.loss   { color: var(--red); }
+
+/* ── Actions ── */
+.plc-actions {
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.plc-open-btn {
+  height: 44px;
+  padding: 0 24px;
+  background: var(--amber);
+  color: #0a0a0a;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.plc-open-btn:hover { opacity: 0.85; }
+.plc-open-error {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--red);
+  flex: 1;
+}
+
+@media (max-width: 680px) {
+  .plc-row3 { grid-template-columns: 1fr; }
+  .plc-field { border-right: none; border-bottom: 1px solid var(--border); }
+  .plc-field:last-child { border-bottom: none; }
+  .plc-summary-grid { grid-template-columns: 1fr; }
+  .plc-sum-card { border-right: none; border-bottom: 1px solid var(--border); }
+}

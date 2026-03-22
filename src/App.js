@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import TradeForm from './components/TradeForm';
 import Dashboard from './components/Dashboard';
-import PipCalculator from './components/PipCalculator';
+import Calculators from './components/Calculators';
 import TradeHistory from './components/TradeHistory';
 import SettingsModal from './components/SettingsModal';
 import Analytics from './components/Analytics';
 import { fetchUsdRate, formatPL } from './priceService';
 
-const TABS = ['trades', 'calculator', 'history', 'analytics'];
+const TABS = ['trades', 'calculators', 'history', 'analytics'];
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || '';
 
 export default function App() {
@@ -18,6 +18,30 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [accountSettings, setAccountSettings] = useState({ size: 10000, currency: 'USD' });
   const [usdRate, setUsdRate] = useState(1);
+  const [theme, setTheme] = useState('system'); // 'dark' | 'light' | 'system'
+
+  // Load saved theme on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('fxt-theme') || 'system';
+    setTheme(saved);
+  }, []);
+
+  // Apply theme to <html> element whenever it changes
+  useEffect(() => {
+    if (theme === 'system') {
+      document.documentElement.removeAttribute('data-theme');
+    } else {
+      document.documentElement.setAttribute('data-theme', theme);
+    }
+    localStorage.setItem('fxt-theme', theme);
+  }, [theme]);
+
+  const cycleTheme = useCallback(() => {
+    setTheme(t => t === 'dark' ? 'light' : t === 'light' ? 'system' : 'dark');
+  }, []);
+
+  const THEME_ICON  = { dark: '◐', light: '◑', system: '◎' };
+  const THEME_LABEL = { dark: 'Dark mode', light: 'Light mode', system: 'System theme' };
 
   // Load persisted trades, history, and settings from SQLite on mount
   useEffect(() => {
@@ -144,6 +168,11 @@ export default function App() {
     setHistory([]);
   }, []);
 
+  const deleteHistoryEntry = useCallback((id) => {
+    fetch(`${BASE_PATH}/api/history?id=${id}`, { method: 'DELETE' }).catch(() => {});
+    setHistory(prev => prev.filter(t => t.id !== id));
+  }, []);
+
   const totalPL = trades.reduce((sum, t) => sum + (t.plUsd || 0), 0);
   const totalPLAccount = totalPL * usdRate;
   const { currency: accountCurrency, size: accountSize } = accountSettings;
@@ -180,6 +209,9 @@ export default function App() {
                 {totalPLAccount >= 0 ? '+' : '-'}{formatPL(totalPLAccount, accountCurrency)}
               </span>
             )}
+            <button className="theme-btn" onClick={cycleTheme} title={THEME_LABEL[theme]}>
+              {THEME_ICON[theme]}
+            </button>
             <button className="settings-btn" onClick={() => setShowSettings(true)} title="Account settings">
               ⚙
             </button>
@@ -201,8 +233,8 @@ export default function App() {
                 usdRate={usdRate}
               />
         )}
-        {tab === 'calculator' && <PipCalculator />}
-        {tab === 'history' && <TradeHistory history={history} onClear={clearHistory} accountCurrency={accountCurrency} accountSize={accountSize} usdRate={usdRate} />}
+        {tab === 'calculators' && <Calculators trades={trades} onOpen={handleOpen} accountCurrency={accountCurrency} accountSize={accountSize} usdRate={usdRate} />}
+        {tab === 'history' && <TradeHistory history={history} onClear={clearHistory} onDelete={deleteHistoryEntry} accountCurrency={accountCurrency} accountSize={accountSize} usdRate={usdRate} />}
         {tab === 'analytics' && <Analytics history={history} accountCurrency={accountCurrency} accountSize={accountSize} usdRate={usdRate} />}
       </main>
 

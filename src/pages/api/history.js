@@ -32,6 +32,11 @@ export default function handler(req, res) {
   }
 
   if (req.method === 'DELETE') {
+    const { id } = req.query;
+    if (id) {
+      db.prepare('DELETE FROM history WHERE id = ?').run(Number(id));
+      return res.json({ success: true });
+    }
     db.prepare('DELETE FROM history').run();
     return res.json({ success: true });
   }

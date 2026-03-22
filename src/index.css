@@ -25,6 +25,48 @@
   --font-sans: 'IBM Plex Sans', sans-serif;
 }
 
+/* Light theme */
+html[data-theme="light"] {
+  --bg: #f4f4f5;
+  --bg-1: #ffffff;
+  --bg-2: #ececec;
+  --bg-3: #e2e2e2;
+  --border: rgba(0, 0, 0, 0.09);
+  --border-hover: rgba(0, 0, 0, 0.18);
+  --text: #111111;
+  --text-muted: #777777;
+  --text-dim: #aaaaaa;
+  --green: #16a34a;
+  --green-dim: rgba(22, 163, 74, 0.1);
+  --red: #dc2626;
+  --red-dim: rgba(220, 38, 38, 0.1);
+  --amber: #d97706;
+  --amber-dim: rgba(217, 119, 6, 0.1);
+  --blue: #0284c7;
+}
+
+/* System: apply light vars when OS prefers light and no explicit theme is set */
+@media (prefers-color-scheme: light) {
+  html:not([data-theme]) {
+    --bg: #f4f4f5;
+    --bg-1: #ffffff;
+    --bg-2: #ececec;
+    --bg-3: #e2e2e2;
+    --border: rgba(0, 0, 0, 0.09);
+    --border-hover: rgba(0, 0, 0, 0.18);
+    --text: #111111;
+    --text-muted: #777777;
+    --text-dim: #aaaaaa;
+    --green: #16a34a;
+    --green-dim: rgba(22, 163, 74, 0.1);
+    --red: #dc2626;
+    --red-dim: rgba(220, 38, 38, 0.1);
+    --amber: #d97706;
+    --amber-dim: rgba(217, 119, 6, 0.1);
+    --blue: #0284c7;
+  }
+}
+
 html, body {
   height: 100%;
   background: var(--bg);

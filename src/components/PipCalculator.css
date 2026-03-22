@@ -1,5 +1,5 @@
 .calc-wrap { display: flex; justify-content: center; padding: 2rem 1rem; }
-.calc-card { width: 100%; max-width: 580px; background: var(--bg-1); border: 1px solid var(--border); border-radius: 2px; overflow: hidden; animation: fadeIn 0.35s ease; }
+.calc-card { width: 100%; max-width: 600; background: var(--bg-1); border: 1px solid var(--border); border-radius: 2px; overflow: hidden; animation: fadeIn 0.35s ease; }
 .calc-header { padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border); }
 .calc-title { font-family: var(--font-mono); font-size: 11px; font-weight: 600; letter-spacing: 0.15em; color: var(--amber); }
 .calc-section { padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border); }
@@ -18,7 +18,7 @@
 .chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .lot-presets { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
 .chip {
-  font-size: 11px; padding: 3px 10px; background: var(--bg-2);
+  font-size: 11px; padding: 3px 8px; background: var(--bg-2);
   border: 1px solid var(--border); color: var(--text-muted);
   border-radius: 2px; font-family: var(--font-mono); cursor: pointer; transition: all 0.15s;
 }

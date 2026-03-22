@@ -227,8 +227,8 @@ export default function Analytics({ history, accountCurrency = 'USD', accountSiz
             <div className="an-top-item">
               <div className="an-top-label">BEST TRADE</div>
               <div className="an-top-pair">{data.best.meta?.display || data.best.key}</div>
-              <div className="an-top-pl" style={{ color: GREEN }}>
-                +{formatPL(data.best.plUsd * usdRate, accountCurrency)}
+              <div className="an-top-pl" style={{ color: data.best.plUsd >= 0 ? GREEN : RED }}>
+                {fmtPL(data.best.plUsd * usdRate)}
               </div>
               <div className="an-top-sub">
                 {data.best.pips.toFixed(1)} pips · {data.best.side.toUpperCase()}
@@ -238,8 +238,8 @@ export default function Analytics({ history, accountCurrency = 'USD', accountSiz
             <div className="an-top-item">
               <div className="an-top-label">WORST TRADE</div>
               <div className="an-top-pair">{data.worst.meta?.display || data.worst.key}</div>
-              <div className="an-top-pl" style={{ color: RED }}>
-                -{formatPL(Math.abs(data.worst.plUsd * usdRate), accountCurrency)}
+              <div className="an-top-pl" style={{ color: data.worst.plUsd >= 0 ? GREEN : RED }}>
+                {fmtPL(data.worst.plUsd * usdRate)}
               </div>
               <div className="an-top-sub">
                 {data.worst.pips.toFixed(1)} pips · {data.worst.side.toUpperCase()}

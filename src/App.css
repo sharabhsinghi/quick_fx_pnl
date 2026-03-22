@@ -63,6 +63,27 @@
 
 .header-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
 
+.theme-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 14px;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.theme-btn:hover {
+  color: var(--amber);
+  border-color: var(--amber);
+  background: var(--amber-dim);
+}
+
 .total-pl {
   font-family: var(--font-mono);
   font-size: 14px;

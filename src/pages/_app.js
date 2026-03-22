@@ -9,6 +9,8 @@ import '../components/TradeHistory.css';
 import '../components/CloseTradeModal.css';
 import '../components/SettingsModal.css';
 import '../components/Analytics.css';
+import '../components/Calculators.css';
+import '../components/PLCalculator.css';
 
 export default function MyApp({ Component, pageProps }) {
   return (
