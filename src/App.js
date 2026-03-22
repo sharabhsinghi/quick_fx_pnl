@@ -1,10 +1,11 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import TradeForm from './components/TradeForm';
 import Dashboard from './components/Dashboard';
 import PipCalculator from './components/PipCalculator';
 import TradeHistory from './components/TradeHistory';
 
 const TABS = ['trades', 'calculator', 'history'];
+const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || '';
 
 export default function App() {
   const [tab, setTab] = useState('trades');
@@ -12,34 +13,97 @@ export default function App() {
   const [history, setHistory] = useState([]); // closed trades
   const [showForm, setShowForm] = useState(false);
 
-  const handleOpen = useCallback((tradeData) => {
-    const newTrade = {
+  // Load persisted trades and history from SQLite on mount
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [tradesRes, historyRes] = await Promise.all([
+          fetch(`${BASE_PATH}/api/trades`),
+          fetch(`${BASE_PATH}/api/history`),
+        ]);
+        if (tradesRes.ok) setTrades(await tradesRes.json());
+        if (historyRes.ok) setHistory(await historyRes.json());
+      } catch (_) {
+        // API unavailable (e.g. static export) — start with empty state
+      }
+    }
+    loadData();
+  }, []);
+
+  const handleOpen = useCallback(async (tradeData) => {
+    const openedAt = new Date().toISOString();
+    let id = Date.now(); // fallback id if API is unavailable
+    try {
+      const res = await fetch(`${BASE_PATH}/api/trades`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          key: tradeData.key,
+          meta: tradeData.meta,
+          side: tradeData.side,
+          entry: tradeData.entry,
+          sl: tradeData.sl,
+          tp: tradeData.tp,
+          lotSize: tradeData.lotSize,
+          openedAt,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        id = data.id;
+      }
+    } catch (_) {}
+
+    setTrades(prev => [...prev, {
       ...tradeData,
-      id: Date.now(),
-      openedAt: new Date().toISOString(),
+      id,
+      openedAt,
       livePrice: null,
       pips: null,
       plUsd: null,
       lastUpdated: null,
       error: null,
       loading: false,
-    };
-    setTrades(prev => [...prev, newTrade]);
+    }]);
     setShowForm(false);
     setTab('trades');
   }, []);
 
-  const handleClose = useCallback((tradeId, closePrice, pips, plUsd) => {
+  const handleClose = useCallback((tradeId, closePrice, pips, plUsd, notes = '') => {
     setTrades(prev => {
       const trade = prev.find(t => t.id === tradeId);
       if (trade) {
+        const closedAt = new Date().toISOString();
         setHistory(h => [{
           ...trade,
           closePrice,
           pips,
           plUsd,
-          closedAt: new Date().toISOString(),
+          notes,
+          closedAt,
         }, ...h]);
+
+        // Persist: remove open trade, add to history (fire-and-forget)
+        fetch(`${BASE_PATH}/api/trades/${tradeId}`, { method: 'DELETE' }).catch(() => {});
+        fetch(`${BASE_PATH}/api/history`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            key: trade.key,
+            meta: trade.meta,
+            side: trade.side,
+            entry: trade.entry,
+            sl: trade.sl,
+            tp: trade.tp,
+            lotSize: trade.lotSize,
+            openedAt: trade.openedAt,
+            closedAt,
+            closePrice,
+            pips,
+            plUsd,
+            notes,
+          }),
+        }).catch(() => {});
       }
       return prev.filter(t => t.id !== tradeId);
     });
@@ -49,7 +113,10 @@ export default function App() {
     setTrades(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
   }, []);
 
-  const clearHistory = useCallback(() => setHistory([]), []);
+  const clearHistory = useCallback(() => {
+    fetch(`${BASE_PATH}/api/history`, { method: 'DELETE' }).catch(() => {});
+    setHistory([]);
+  }, []);
 
   const totalPL = trades.reduce((sum, t) => sum + (t.plUsd || 0), 0);
 

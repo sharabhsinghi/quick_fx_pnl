@@ -1,7 +1,19 @@
-import React, { useState } from 'react';
-import { normalizePair, getPairMeta, getSupportedPairs } from '../priceService';
+import React, { useState, useEffect, useRef } from 'react';
+import { normalizePair, getPairMeta, getSupportedPairs, fetchLivePrice } from '../priceService';
 
 const POPULAR_PAIRS = ['EUR/USD', 'GBP/USD', 'USD/JPY', 'AUD/USD', 'USD/CHF', 'EUR/GBP', 'GBP/JPY', 'EUR/JPY'];
+const DEFAULT_SL_PIPS = 50;
+const DEFAULT_TP_PIPS = 100; // 1:2 RR
+
+function computeAutoSlTp(entryPrice, side, pipSize) {
+  const dec = pipSize <= 0.001 ? 3 : 5;
+  const slDist = DEFAULT_SL_PIPS * pipSize;
+  const tpDist = DEFAULT_TP_PIPS * pipSize;
+  if (side === 'buy') {
+    return { sl: (entryPrice - slDist).toFixed(dec), tp: (entryPrice + tpDist).toFixed(dec) };
+  }
+  return { sl: (entryPrice + slDist).toFixed(dec), tp: (entryPrice - tpDist).toFixed(dec) };
+}
 
 export default function TradeForm({ onOpen, onCancel }) {
   const [pair, setPair] = useState('');
@@ -11,6 +23,55 @@ export default function TradeForm({ onOpen, onCancel }) {
   const [tp, setTp] = useState('');
   const [lotSize, setLotSize] = useState('100000');
   const [error, setError] = useState('');
+  const [priceLoading, setPriceLoading] = useState(false);
+  // Track if user manually edited SL or TP; reset when entry is (re)autofilled
+  const slTpManual = useRef(false);
+
+  const pairKey = normalizePair(pair);
+  const pairMeta = getPairMeta(pairKey);
+
+  // Fetch live price when a valid pair is selected and autofill entry + SL/TP
+  useEffect(() => {
+    if (!pairMeta) return;
+    let cancelled = false;
+    setPriceLoading(true);
+    fetchLivePrice(pairKey)
+      .then(result => {
+        if (cancelled) return;
+        const dec = pairMeta.pipSize <= 0.001 ? 3 : 5;
+        const entryStr = result.price.toFixed(dec);
+        setEntry(entryStr);
+        slTpManual.current = false;
+        const auto = computeAutoSlTp(result.price, side, pairMeta.pipSize);
+        setSl(auto.sl);
+        setTp(auto.tp);
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setPriceLoading(false); });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pairKey]); // `side` is intentionally omitted — handled in handleSideChange
+
+  const handleSideChange = (newSide) => {
+    setSide(newSide);
+    const entryN = parseFloat(entry);
+    if (!isNaN(entryN) && pairMeta && !slTpManual.current) {
+      const auto = computeAutoSlTp(entryN, newSide, pairMeta.pipSize);
+      setSl(auto.sl);
+      setTp(auto.tp);
+    }
+  };
+
+  const handleEntryChange = (val) => {
+    setEntry(val);
+    slTpManual.current = false; // manual entry re-enables auto SL/TP
+    const entryN = parseFloat(val);
+    if (!isNaN(entryN) && pairMeta) {
+      const auto = computeAutoSlTp(entryN, side, pairMeta.pipSize);
+      setSl(auto.sl);
+      setTp(auto.tp);
+    }
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -42,7 +103,8 @@ export default function TradeForm({ onOpen, onCancel }) {
           <div className="field-group">
             <label className="field-label">CURRENCY PAIR</label>
             <input className="field-input" type="text" value={pair}
-              onChange={e => setPair(e.target.value)} placeholder="e.g. EUR/USD"
+              onChange={e => { setPair(e.target.value); }}
+              placeholder="e.g. EUR/USD"
               autoComplete="off" spellCheck={false} />
             <div className="quick-pairs">
               {POPULAR_PAIRS.map(p => (
@@ -56,23 +118,32 @@ export default function TradeForm({ onOpen, onCancel }) {
           <div className="field-group">
             <label className="field-label">DIRECTION</label>
             <div className="side-toggle">
-              <button type="button" className={`side-btn buy ${side==='buy'?'active':''}`} onClick={()=>setSide('buy')}>▲ BUY / LONG</button>
-              <button type="button" className={`side-btn sell ${side==='sell'?'active':''}`} onClick={()=>setSide('sell')}>▼ SELL / SHORT</button>
+              <button type="button" className={`side-btn buy ${side==='buy'?'active':''}`} onClick={()=>handleSideChange('buy')}>▲ BUY / LONG</button>
+              <button type="button" className={`side-btn sell ${side==='sell'?'active':''}`} onClick={()=>handleSideChange('sell')}>▼ SELL / SHORT</button>
             </div>
           </div>
 
           <div className="fields-row">
             <div className="field-group">
-              <label className="field-label">ENTRY PRICE</label>
-              <input className="field-input" type="number" step="any" value={entry} onChange={e=>setEntry(e.target.value)} placeholder="1.08500" />
+              <label className="field-label">
+                ENTRY PRICE
+                {priceLoading && <span className="field-hint"> · fetching…</span>}
+                {!priceLoading && pairMeta && entry && <span className="field-hint"> · live</span>}
+              </label>
+              <input className="field-input" type="number" step="any" value={entry}
+                onChange={e => handleEntryChange(e.target.value)} placeholder="1.08500" />
             </div>
             <div className="field-group">
-              <label className="field-label">STOP LOSS</label>
-              <input className="field-input sl" type="number" step="any" value={sl} onChange={e=>setSl(e.target.value)} placeholder="1.08000" />
+              <label className="field-label">STOP LOSS </label>
+              <input className="field-input sl" type="number" step="any" value={sl}
+                onChange={e => { slTpManual.current = true; setSl(e.target.value); }}
+                placeholder="1.08000" />
             </div>
             <div className="field-group">
-              <label className="field-label">TAKE PROFIT</label>
-              <input className="field-input tp" type="number" step="any" value={tp} onChange={e=>setTp(e.target.value)} placeholder="1.09000" />
+              <label className="field-label">TAKE PROFIT </label>
+              <input className="field-input tp" type="number" step="any" value={tp}
+                onChange={e => { slTpManual.current = true; setTp(e.target.value); }}
+                placeholder="1.09000" />
             </div>
           </div>
 

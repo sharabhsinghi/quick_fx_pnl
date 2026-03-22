@@ -85,21 +85,29 @@ export default function TradeHistory({ history, onClear }) {
             {history.map((t, i) => {
               const won = t.plUsd >= 0;
               return (
-                <div key={t.id ?? i} className={`ht-row ${won ? 'won' : 'lost'}`}>
-                  <span className="ht-pair">{t.meta.display}</span>
-                  <span className={`ht-side ${t.side}`}>
-                    {t.side === 'buy' ? '▲' : '▼'} {t.side.toUpperCase()}
-                  </span>
-                  <span className="ht-price">{formatPrice(t.entry, t.meta.pipSize)}</span>
-                  <span className="ht-price">{formatPrice(t.closePrice, t.meta.pipSize)}</span>
-                  <span className={`ht-pips ${won ? 'profit' : 'loss'}`}>
-                    {t.pips >= 0 ? '+' : ''}{t.pips.toFixed(1)}
-                  </span>
-                  <span className={`ht-pl ${won ? 'profit' : 'loss'}`}>
-                    {t.plUsd >= 0 ? '+' : ''}${Math.abs(t.plUsd).toFixed(2)}
-                  </span>
-                  <span className="ht-time">{fmt(t.closedAt)}</span>
-                </div>
+                <React.Fragment key={t.id ?? i}>
+                  <div className={`ht-row ${won ? 'won' : 'lost'}`}>
+                    <span className="ht-pair">{t.meta.display}</span>
+                    <span className={`ht-side ${t.side}`}>
+                      {t.side === 'buy' ? '▲' : '▼'} {t.side.toUpperCase()}
+                    </span>
+                    <span className="ht-price">{formatPrice(t.entry, t.meta.pipSize)}</span>
+                    <span className="ht-price">{formatPrice(t.closePrice, t.meta.pipSize)}</span>
+                    <span className={`ht-pips ${won ? 'profit' : 'loss'}`}>
+                      {t.pips >= 0 ? '+' : ''}{t.pips.toFixed(1)}
+                    </span>
+                    <span className={`ht-pl ${won ? 'profit' : 'loss'}`}>
+                      {t.plUsd >= 0 ? '+' : ''}${Math.abs(t.plUsd).toFixed(2)}
+                    </span>
+                    <span className="ht-time">{fmt(t.closedAt)}</span>
+                  </div>
+                  {t.notes && (
+                    <div className="ht-notes">
+                      <span className="ht-notes-label">NOTE</span>
+                      <span className="ht-notes-text">{t.notes}</span>
+                    </div>
+                  )}
+                </React.Fragment>
               );
             })}
           </div>

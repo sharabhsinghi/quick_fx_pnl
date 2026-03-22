@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { fetchLivePrice, calcPnL, calcRR, formatPrice } from '../priceService';
+import CloseTradeModal from './CloseTradeModal';
 
 const AUTO_INTERVALS = [0, 30, 60, 300]; // seconds; 0 = off
 const INTERVAL_LABELS = ['Off', '30s', '1m', '5m'];
 
 export default function TradeCard({ trade, onClose, onUpdate }) {
   const [autoIdx, setAutoIdx] = useState(0);
-  const [confirmClose, setConfirmClose] = useState(false);
+  const [showCloseModal, setShowCloseModal] = useState(false);
   const timerRef = useRef(null);
 
   const refresh = useCallback(async () => {
@@ -47,8 +48,9 @@ export default function TradeCard({ trade, onClose, onUpdate }) {
   // Fetch on mount
   useEffect(() => { refresh(); }, []); // eslint-disable-line
 
-  const handleClose = () => {
-    onClose(trade.id, trade.livePrice ?? trade.entry, trade.pips ?? 0, trade.plUsd ?? 0);
+  const handleModalConfirm = (tradeId, closePrice, pips, plUsd, notes) => {
+    setShowCloseModal(false);
+    onClose(tradeId, closePrice, pips, plUsd, notes);
   };
 
   const rr = calcRR({ entry: trade.entry, sl: trade.sl, tp: trade.tp, side: trade.side });
@@ -74,6 +76,13 @@ export default function TradeCard({ trade, onClose, onUpdate }) {
 
   return (
     <div className={`trade-card ${hasData ? (profitable ? 'card-profit' : 'card-loss') : ''}`}>
+      {showCloseModal && (
+        <CloseTradeModal
+          trade={trade}
+          onConfirm={handleModalConfirm}
+          onCancel={() => setShowCloseModal(false)}
+        />
+      )}
       {/* Card header */}
       <div className="tc-header">
         <div className="tc-pair">{trade.meta.display}</div>
@@ -147,14 +156,7 @@ export default function TradeCard({ trade, onClose, onUpdate }) {
           AUTO: {INTERVAL_LABELS[autoIdx]}
         </button>
 
-        {confirmClose ? (
-          <>
-            <button className="tc-btn-confirm" onClick={handleClose}>CONFIRM</button>
-            <button className="tc-btn-cancel" onClick={() => setConfirmClose(false)}>CANCEL</button>
-          </>
-        ) : (
-          <button className="tc-btn-close" onClick={() => setConfirmClose(true)}>✕ CLOSE</button>
-        )}
+        <button className="tc-btn-close" onClick={() => setShowCloseModal(true)}>✕ CLOSE</button>
       </div>
     </div>
   );

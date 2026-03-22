@@ -51,3 +51,25 @@
 .ht-pips.profit, .ht-pl.profit { color: var(--green); }
 .ht-pips.loss, .ht-pl.loss { color: var(--red); }
 .ht-time { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); }
+
+.ht-notes {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 14px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.ht-notes-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.ht-notes-text {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
