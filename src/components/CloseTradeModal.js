@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { calcPnL, formatPrice } from '../priceService';
+import { calcPnL, formatPrice, formatPL } from '../priceService';
 
 function defaultClosePrice(trade) {
   const dec = trade.meta.pipSize <= 0.001 ? 3 : 5;
@@ -11,7 +11,7 @@ function defaultClosePrice(trade) {
   return (lp <= trade.entry ? trade.tp : trade.sl).toFixed(dec);
 }
 
-export default function CloseTradeModal({ trade, onConfirm, onCancel }) {
+export default function CloseTradeModal({ trade, onConfirm, onCancel, accountCurrency = 'USD', accountSize = 0, usdRate = 1 }) {
   const dec = trade.meta.pipSize <= 0.001 ? 3 : 5;
   const [closePrice, setClosePrice] = useState(() => defaultClosePrice(trade));
   const [notes, setNotes] = useState('');
@@ -29,6 +29,8 @@ export default function CloseTradeModal({ trade, onConfirm, onCancel }) {
   }, [closePriceN, trade.entry, trade.side, trade.lotSize, trade.meta.pipSize]);
 
   const profitable = pnl && pnl.plUsd >= 0;
+  const plAccount = pnl ? pnl.plUsd * usdRate : null;
+  const plPct = accountSize > 0 && plAccount != null ? (plAccount / accountSize) * 100 : null;
 
   const handleConfirm = () => {
     const cp = isNaN(closePriceN) ? (trade.livePrice ?? trade.entry) : closePriceN;
@@ -98,14 +100,17 @@ export default function CloseTradeModal({ trade, onConfirm, onCancel }) {
         </div>
 
         {/* Computed P/L */}
-        {pnl && (
+        {pnl && plAccount != null && (
           <div className={`ctm-pl ${profitable ? 'profit' : 'loss'}`}>
             <span className="ctm-pl-usd">
-              {pnl.plUsd >= 0 ? '+' : ''}${Math.abs(pnl.plUsd).toFixed(2)}
+              {plAccount >= 0 ? '+' : '-'}{formatPL(plAccount, accountCurrency)}
             </span>
             <span className="ctm-pl-sep">·</span>
             <span className="ctm-pl-pips">
               {pnl.pips >= 0 ? '+' : ''}{pnl.pips.toFixed(1)} pips
+              {plPct != null && (
+                <span> · {plPct >= 0 ? '+' : ''}{plPct.toFixed(2)}% acct</span>
+              )}
             </span>
           </div>
         )}

@@ -60,6 +60,7 @@
 .tc-pl.loss .tc-pl-usd { color: var(--red); }
 .tc-pl.loss .tc-pl-pips { color: var(--red); }
 .tc-pl.neutral .tc-pl-usd { color: var(--text-dim); }
+.tc-pl-pct { opacity: 0.8; }
 
 .tc-progress-track {
   height: 2px;

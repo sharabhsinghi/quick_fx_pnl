@@ -85,6 +85,45 @@ export async function fetchLivePrice(pairKey) {
   return result;
 }
 
+const _usdRateCache = new Map(); // targetCurrency -> { rate, ts }
+
+export async function fetchUsdRate(targetCurrency) {
+  if (targetCurrency === 'USD') return 1;
+  const cached = _usdRateCache.get(targetCurrency);
+  if (cached && Date.now() - cached.ts < CACHE_TTL_MS) return cached.rate;
+  try {
+    const r = await fetch(
+      `https://api.frankfurter.app/latest?from=USD&to=${targetCurrency}`,
+      { signal: AbortSignal.timeout(8000) }
+    );
+    if (r.ok) {
+      const data = await r.json();
+      const rate = data.rates?.[targetCurrency];
+      if (rate) {
+        _usdRateCache.set(targetCurrency, { rate, ts: Date.now() });
+        return rate;
+      }
+    }
+  } catch (_) {}
+  return 1; // fallback: treat as USD if fetch fails
+}
+
+const CURRENCY_SYMBOLS = {
+  USD: '$', EUR: '€', GBP: '£', JPY: '¥',
+  AUD: 'A$', CAD: 'C$', CHF: 'Fr', NZD: 'NZ$', SGD: 'S$', HKD: 'HK$',
+};
+
+export function getCurrencySymbol(currency) {
+  return CURRENCY_SYMBOLS[currency] ?? currency;
+}
+
+// Formats the absolute value of amount with the currency symbol (no sign).
+export function formatPL(amount, currency = 'USD') {
+  const decimals = currency === 'JPY' ? 0 : 2;
+  const sym = CURRENCY_SYMBOLS[currency] ?? `${currency} `;
+  return `${sym}${Math.abs(amount).toFixed(decimals)}`;
+}
+
 export function calcPnL({ entry, currentPrice, side, lotSize, pipSize }) {
   const direction = side === 'buy' ? 1 : -1;
   const pips = direction * (currentPrice - entry) / pipSize;

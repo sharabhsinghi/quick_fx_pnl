@@ -1,15 +1,15 @@
 import React, { useMemo } from 'react';
-import { formatPrice } from '../priceService';
+import { formatPrice, formatPL } from '../priceService';
 
-export default function TradeHistory({ history, onClear }) {
+export default function TradeHistory({ history, onClear, accountCurrency = 'USD', accountSize = 0, usdRate = 1 }) {
   const stats = useMemo(() => {
     if (!history.length) return null;
     const wins = history.filter(t => t.plUsd >= 0).length;
-    const totalPL = history.reduce((s, t) => s + t.plUsd, 0);
+    const totalPL = history.reduce((s, t) => s + t.plUsd, 0) * usdRate;
     const totalPips = history.reduce((s, t) => s + t.pips, 0);
     const avgPL = totalPL / history.length;
     return { wins, losses: history.length - wins, totalPL, totalPips, avgPL, count: history.length };
-  }, [history]);
+  }, [history, usdRate]);
 
   const fmt = (d) => {
     const date = new Date(d);
@@ -37,9 +37,9 @@ export default function TradeHistory({ history, onClear }) {
               <div className="stat-value">{((stats.wins / stats.count) * 100).toFixed(0)}%</div>
             </div>
             <div className="stat-item">
-              <div className="stat-label">TOTAL P/L</div>
+              <div className="stat-label">TOTAL P/L ({accountCurrency})</div>
               <div className={`stat-value ${stats.totalPL >= 0 ? 'profit' : 'loss'}`}>
-                {stats.totalPL >= 0 ? '+' : ''}${stats.totalPL.toFixed(2)}
+                {stats.totalPL >= 0 ? '+' : '-'}{formatPL(stats.totalPL, accountCurrency)}
               </div>
             </div>
             <div className="stat-item">
@@ -49,9 +49,9 @@ export default function TradeHistory({ history, onClear }) {
               </div>
             </div>
             <div className="stat-item">
-              <div className="stat-label">AVG P/L</div>
+              <div className="stat-label">AVG P/L ({accountCurrency})</div>
               <div className={`stat-value ${stats.avgPL >= 0 ? 'profit' : 'loss'}`}>
-                {stats.avgPL >= 0 ? '+' : ''}${stats.avgPL.toFixed(2)}
+                {stats.avgPL >= 0 ? '+' : '-'}{formatPL(stats.avgPL, accountCurrency)}
               </div>
             </div>
             <div className="stat-item">
@@ -79,7 +79,7 @@ export default function TradeHistory({ history, onClear }) {
               <span>ENTRY</span>
               <span>EXIT</span>
               <span>PIPS</span>
-              <span>P/L USD</span>
+              <span>P/L {accountCurrency}</span>
               <span>CLOSED</span>
             </div>
             {history.map((t, i) => {
@@ -97,7 +97,7 @@ export default function TradeHistory({ history, onClear }) {
                       {t.pips >= 0 ? '+' : ''}{t.pips.toFixed(1)}
                     </span>
                     <span className={`ht-pl ${won ? 'profit' : 'loss'}`}>
-                      {t.plUsd >= 0 ? '+' : ''}${Math.abs(t.plUsd).toFixed(2)}
+                      {t.plUsd * usdRate >= 0 ? '+' : '-'}{formatPL(t.plUsd * usdRate, accountCurrency)}
                     </span>
                     <span className="ht-time">{fmt(t.closedAt)}</span>
                   </div>

@@ -61,7 +61,7 @@
 .nav-btn:hover { color: var(--text); }
 .nav-btn.active { color: var(--amber); border-bottom-color: var(--amber); }
 
-.header-right { margin-left: auto; }
+.header-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
 
 .total-pl {
   font-family: var(--font-mono);

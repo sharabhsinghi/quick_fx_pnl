@@ -42,6 +42,15 @@ export function getDb() {
     // Migrations: add columns to existing DBs that predate them
     try { db.exec(`ALTER TABLE history ADD COLUMN notes TEXT NOT NULL DEFAULT ''`); } catch (_) {}
     try { db.exec(`ALTER TABLE trades  ADD COLUMN notes TEXT NOT NULL DEFAULT ''`); } catch (_) {}
+
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS settings (
+        key   TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      );
+    `);
+    db.prepare(`INSERT OR IGNORE INTO settings (key, value) VALUES ('account_size',     '10000')`).run();
+    db.prepare(`INSERT OR IGNORE INTO settings (key, value) VALUES ('account_currency', 'USD')`).run();
   }
   return db;
 }

@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import TradeCard from './TradeCard';
+import { formatPL } from '../priceService';
 
-export default function Dashboard({ trades, onAddTrade, onClose, onUpdate }) {
+export default function Dashboard({ trades, onAddTrade, onClose, onUpdate, accountCurrency = 'USD', accountSize = 0, usdRate = 1 }) {
   const totalPL = trades.reduce((s, t) => s + (t.plUsd || 0), 0);
+  const totalPLAccount = totalPL * usdRate;
   const totalPips = trades.reduce((s, t) => s + (t.pips || 0), 0);
 
   return (
@@ -14,9 +16,9 @@ export default function Dashboard({ trades, onAddTrade, onClose, onUpdate }) {
             <span className="si-value">{trades.length}</span>
           </div>
           <div className="summary-item">
-            <span className="si-label">TOTAL P/L (USD)</span>
-            <span className={`si-value ${totalPL >= 0 ? 'profit' : 'loss'}`}>
-              {totalPL >= 0 ? '+' : ''}${totalPL.toFixed(2)}
+            <span className="si-label">TOTAL P/L ({accountCurrency})</span>
+            <span className={`si-value ${totalPLAccount >= 0 ? 'profit' : 'loss'}`}>
+              {totalPLAccount >= 0 ? '+' : '-'}{formatPL(totalPLAccount, accountCurrency)}
             </span>
           </div>
           <div className="summary-item">
@@ -35,6 +37,9 @@ export default function Dashboard({ trades, onAddTrade, onClose, onUpdate }) {
             trade={trade}
             onClose={onClose}
             onUpdate={onUpdate}
+            accountCurrency={accountCurrency}
+            accountSize={accountSize}
+            usdRate={usdRate}
           />
         ))}
 

@@ -21,7 +21,8 @@ export default function TradeForm({ onOpen, onCancel }) {
   const [entry, setEntry] = useState('');
   const [sl, setSl] = useState('');
   const [tp, setTp] = useState('');
-  const [lotSize, setLotSize] = useState('100000');
+  const [lotSize, setLotSize] = useState('10000');
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
   const [priceLoading, setPriceLoading] = useState(false);
@@ -87,7 +88,7 @@ export default function TradeForm({ onOpen, onCancel }) {
     if (side === 'buy' && tpN <= entryN) { setError('BUY: Take Profit must be above Entry.'); return; }
     if (side === 'sell' && slN <= entryN) { setError('SELL: Stop Loss must be above Entry.'); return; }
     if (side === 'sell' && tpN >= entryN) { setError('SELL: Take Profit must be below Entry.'); return; }
-    onOpen({ key, meta, side, entry: entryN, sl: slN, tp: tpN, lotSize: lotN, notes });
+    onOpen({ key, meta, side, entry: entryN, sl: slN, tp: tpN, lotSize: lotN, notes, openDate: date });
   };
 
   return (
@@ -149,6 +150,12 @@ export default function TradeForm({ onOpen, onCancel }) {
           </div>
 
           <div className="field-group">
+            <label className="field-label">TRADE DATE</label>
+            <input className="field-input" type="date" value={date}
+              onChange={e => setDate(e.target.value)} />
+          </div>
+
+          <div className="field-group">
             <label className="field-label">LOT SIZE <span className="label-hint">(100,000 = 1 standard lot)</span></label>
             <div className="lot-row">
               <input className="field-input" type="number" step="1" value={lotSize} onChange={e=>setLotSize(e.target.value)} placeholder="100000" />
@@ -175,10 +182,10 @@ export default function TradeForm({ onOpen, onCancel }) {
           <button type="submit" className="open-btn">OPEN TRADE →</button>
         </form>
 
-        <div className="supported-pairs">
+        {/* <div className="supported-pairs">
           <span className="sp-label">Supported: </span>
           <span className="sp-list">{getSupportedPairs().join('  ·  ')}</span>
-        </div>
+        </div> */}
       </div>
     </div>
   );

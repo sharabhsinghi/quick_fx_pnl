@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { fetchLivePrice, calcPnL, calcRR, formatPrice } from '../priceService';
+import { fetchLivePrice, calcPnL, calcRR, formatPrice, formatPL } from '../priceService';
 import CloseTradeModal from './CloseTradeModal';
 
 const AUTO_INTERVALS = [0, 30, 60, 300]; // seconds; 0 = off
 const INTERVAL_LABELS = ['Off', '30s', '1m', '5m'];
 
-export default function TradeCard({ trade, onClose, onUpdate }) {
+export default function TradeCard({ trade, onClose, onUpdate, accountCurrency = 'USD', accountSize = 0, usdRate = 1 }) {
   const [autoIdx, setAutoIdx] = useState(0);
   const [showCloseModal, setShowCloseModal] = useState(false);
   const timerRef = useRef(null);
@@ -56,6 +56,8 @@ export default function TradeCard({ trade, onClose, onUpdate }) {
   const rr = calcRR({ entry: trade.entry, sl: trade.sl, tp: trade.tp, side: trade.side });
   const profitable = trade.plUsd != null && trade.plUsd >= 0;
   const hasData = trade.livePrice != null;
+  const plAccount = (trade.plUsd ?? 0) * usdRate;
+  const plPct = accountSize > 0 && hasData ? (plAccount / accountSize) * 100 : null;
 
   // Progress toward TP or toward SL
   let progress = 0;
@@ -81,6 +83,9 @@ export default function TradeCard({ trade, onClose, onUpdate }) {
           trade={trade}
           onConfirm={handleModalConfirm}
           onCancel={() => setShowCloseModal(false)}
+          accountCurrency={accountCurrency}
+          accountSize={accountSize}
+          usdRate={usdRate}
         />
       )}
       {/* Card header */}
@@ -96,11 +101,14 @@ export default function TradeCard({ trade, onClose, onUpdate }) {
       <div className={`tc-pl ${hasData ? (profitable ? 'profit' : 'loss') : 'neutral'}`}>
         <div className="tc-pl-usd">
           {hasData
-            ? `${trade.plUsd >= 0 ? '+' : ''}$${Math.abs(trade.plUsd).toFixed(2)}`
+            ? `${plAccount >= 0 ? '+' : '-'}${formatPL(plAccount, accountCurrency)}`
             : '——'}
         </div>
         <div className="tc-pl-pips">
           {hasData ? `${trade.pips >= 0 ? '+' : ''}${trade.pips.toFixed(1)} pips` : ''}
+          {plPct != null && (
+            <span className="tc-pl-pct"> · {plPct >= 0 ? '+' : ''}{plPct.toFixed(2)}% acct</span>
+          )}
         </div>
       </div>
 

@@ -1,0 +1,156 @@
+.sm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+  animation: fadeIn 0.15s ease;
+}
+
+.sm-panel {
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  width: 100%;
+  max-width: 380px;
+  overflow: hidden;
+  animation: slideUp 0.18s ease;
+}
+
+.sm-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sm-title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--text-muted);
+}
+
+.sm-x {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0;
+  line-height: 1;
+  transition: color 0.15s;
+}
+.sm-x:hover { color: var(--text); }
+
+.sm-body {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.sm-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sm-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.sm-hint {
+  color: var(--text-dim);
+  font-size: 9px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.sm-select,
+.sm-input {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  padding: 9px 10px;
+  outline: none;
+  transition: border-color 0.15s;
+  width: 100%;
+}
+.sm-select:focus,
+.sm-input:focus { border-color: var(--amber); }
+.sm-select option { background: var(--bg-1); }
+
+.sm-preview {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.sm-error {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--red);
+  background: var(--red-dim);
+  padding: 6px 10px;
+  border-radius: 2px;
+}
+
+.sm-actions {
+  display: flex;
+  border-top: 1px solid var(--border);
+}
+
+.sm-btn-cancel,
+.sm-btn-save {
+  flex: 1;
+  height: 44px;
+  background: transparent;
+  border: none;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.sm-btn-cancel {
+  color: var(--text-muted);
+  border-right: 1px solid var(--border);
+}
+.sm-btn-cancel:hover { background: var(--bg-2); color: var(--text); }
+
+.sm-btn-save {
+  color: var(--amber);
+  font-weight: 600;
+}
+.sm-btn-save:hover { background: rgba(255,176,0,0.08); }
+
+/* Gear icon button in header */
+.settings-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.settings-btn:hover { color: var(--amber); border-color: var(--amber); background: rgba(255,176,0,0.06); }

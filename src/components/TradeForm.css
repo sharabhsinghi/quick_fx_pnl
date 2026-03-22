@@ -15,7 +15,7 @@
 .field-input.sl:focus { border-color: var(--red); }
 .field-input.tp:focus { border-color: var(--green); }
 .quick-pairs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-.pair-chip { font-size: 11px; padding: 3px 10px; background: var(--bg-2); border: 1px solid var(--border); color: var(--text-muted); border-radius: 2px; font-family: var(--font-mono); letter-spacing: 0.04em; transition: all 0.15s; cursor: pointer; }
+.pair-chip { font-size: 11px; padding: 3px 8px; background: var(--bg-2); border: 1px solid var(--border); color: var(--text-muted); border-radius: 2px; font-family: var(--font-mono); letter-spacing: 0.04em; transition: all 0.15s; cursor: pointer; }
 .pair-chip:hover { border-color: var(--border-hover); color: var(--text); }
 .pair-chip.active { border-color: var(--amber); color: var(--amber); background: var(--amber-dim); }
 .side-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }

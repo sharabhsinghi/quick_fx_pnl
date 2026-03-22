@@ -7,6 +7,8 @@ import '../components/TradeCard.css';
 import '../components/TradeForm.css';
 import '../components/TradeHistory.css';
 import '../components/CloseTradeModal.css';
+import '../components/SettingsModal.css';
+import '../components/Analytics.css';
 
 export default function MyApp({ Component, pageProps }) {
   return (
