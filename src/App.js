@@ -96,6 +96,7 @@ export default function App() {
           lotSize: tradeData.lotSize,
           openedAt,
           notes: tradeData.notes || '',
+          checklist: tradeData.checklist || [],
         }),
       });
       if (res.ok) {
@@ -108,6 +109,7 @@ export default function App() {
       ...tradeData,
       id,
       openedAt,
+      checklist: tradeData.checklist || [],
       livePrice: null,
       pips: null,
       plUsd: null,

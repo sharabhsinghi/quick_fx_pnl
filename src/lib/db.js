@@ -19,7 +19,8 @@ export function getDb() {
         lotSize  REAL    NOT NULL,
         openedAt TEXT    NOT NULL,
         meta     TEXT    NOT NULL,
-        notes    TEXT    NOT NULL DEFAULT ''
+        notes    TEXT    NOT NULL DEFAULT '',
+        checklist TEXT   NOT NULL DEFAULT '[]'
       );
 
       CREATE TABLE IF NOT EXISTS history (
@@ -42,6 +43,7 @@ export function getDb() {
     // Migrations: add columns to existing DBs that predate them
     try { db.exec(`ALTER TABLE history ADD COLUMN notes TEXT NOT NULL DEFAULT ''`); } catch (_) {}
     try { db.exec(`ALTER TABLE trades  ADD COLUMN notes TEXT NOT NULL DEFAULT ''`); } catch (_) {}
+    try { db.exec(`ALTER TABLE trades  ADD COLUMN checklist TEXT NOT NULL DEFAULT '[]'`); } catch (_) {}
 
     db.exec(`
       CREATE TABLE IF NOT EXISTS settings (

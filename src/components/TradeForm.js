@@ -5,6 +5,16 @@ const POPULAR_PAIRS = ['EUR/USD', 'GBP/USD', 'USD/JPY', 'AUD/USD', 'USD/CHF', 'E
 const DEFAULT_SL_PIPS = 50;
 const DEFAULT_TP_PIPS = 100; // 1:2 RR
 
+const CHECKLIST_ITEMS = [
+  'I am in my session window (London or NY open, ideally overlap)',
+  'D1 market structure is clear — I know if I\'m biased long or short today',
+  'I have 2–3 key S&R zones marked on D1/H4 and they extend to H1',
+  'Price has reached one of my pre-marked zones — I didn\'t chase it mid-air',
+  'There is a clear PA signal (pin bar / engulfing / morning star) AT the zone',
+  'No major news event in the next 30 minutes (checked economic calendar)',
+  'The PA signal aligns with D1 bias — I\'m not fighting the higher timeframe',
+];
+
 function computeAutoSlTp(entryPrice, side, pipSize) {
   const dec = pipSize <= 0.001 ? 3 : 5;
   const slDist = DEFAULT_SL_PIPS * pipSize;
@@ -24,6 +34,7 @@ export default function TradeForm({ onOpen, onCancel }) {
   const [lotSize, setLotSize] = useState('10000');
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState('');
+  const [checklist, setChecklist] = useState(Array(CHECKLIST_ITEMS.length).fill(false));
   const [error, setError] = useState('');
   const [priceLoading, setPriceLoading] = useState(false);
   // Track if user manually edited SL or TP; reset when entry is (re)autofilled
@@ -88,7 +99,7 @@ export default function TradeForm({ onOpen, onCancel }) {
     if (side === 'buy' && tpN <= entryN) { setError('BUY: Take Profit must be above Entry.'); return; }
     if (side === 'sell' && slN <= entryN) { setError('SELL: Stop Loss must be above Entry.'); return; }
     if (side === 'sell' && tpN >= entryN) { setError('SELL: Take Profit must be below Entry.'); return; }
-    onOpen({ key, meta, side, entry: entryN, sl: slN, tp: tpN, lotSize: lotN, notes, openDate: date });
+    onOpen({ key, meta, side, entry: entryN, sl: slN, tp: tpN, lotSize: lotN, notes, openDate: date, checklist });
   };
 
   return (
@@ -176,6 +187,25 @@ export default function TradeForm({ onOpen, onCancel }) {
               onChange={e => setNotes(e.target.value)}
               rows={3}
             />
+          </div>
+
+          <div className="field-group">
+            <label className="field-label">
+              PRE-TRADE CHECKLIST
+              <span className="checklist-score">{checklist.filter(Boolean).length}/{CHECKLIST_ITEMS.length}</span>
+            </label>
+            <div className="checklist">
+              {CHECKLIST_ITEMS.map((item, i) => (
+                <label key={i} className={`checklist-item ${checklist[i] ? 'checked' : ''}`}>
+                  <input
+                    type="checkbox"
+                    checked={checklist[i]}
+                    onChange={() => setChecklist(prev => prev.map((v, idx) => idx === i ? !v : v))}
+                  />
+                  <span className="checklist-text">{item}</span>
+                </label>
+              ))}
+            </div>
           </div>
 
           {error && <div className="form-error">⚠ {error}</div>}

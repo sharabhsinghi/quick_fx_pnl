@@ -8,6 +8,7 @@ export default function handler(req, res) {
     const trades = rows.map(row => ({
       ...row,
       meta: JSON.parse(row.meta),
+      checklist: row.checklist ? JSON.parse(row.checklist) : [],
       livePrice: null,
       pips: null,
       plUsd: null,
@@ -19,17 +20,18 @@ export default function handler(req, res) {
   }
 
   if (req.method === 'POST') {
-    const { key, meta, side, entry, sl, tp, lotSize, openedAt, notes } = req.body;
+    const { key, meta, side, entry, sl, tp, lotSize, openedAt, notes, checklist } = req.body;
     if (!key || !meta || !side || entry == null || sl == null || tp == null || lotSize == null || !openedAt) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
     const stmt = db.prepare(
-      'INSERT INTO trades (key, side, entry, sl, tp, lotSize, openedAt, meta, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      'INSERT INTO trades (key, side, entry, sl, tp, lotSize, openedAt, meta, notes, checklist) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     );
     const result = stmt.run(
       String(key), String(side),
       Number(entry), Number(sl), Number(tp), Number(lotSize),
-      String(openedAt), JSON.stringify(meta), String(notes || '')
+      String(openedAt), JSON.stringify(meta), String(notes || ''),
+      JSON.stringify(Array.isArray(checklist) ? checklist : [])
     );
     return res.status(201).json({ id: Number(result.lastInsertRowid) });
   }
