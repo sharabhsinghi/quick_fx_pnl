@@ -82,10 +82,17 @@ function TradeDetailModal({ trade, onClose, accountCurrency, usdRate }) {
             </div>
           )}
 
-          {trade.notes && (
+          {(trade.openNotes || trade.notes) && (
             <div className="tdm-section">
-              <div className="tdm-section-label">NOTES</div>
-              <div className="tdm-notes">{trade.notes}</div>
+              <div className="tdm-section-label">OPENING NOTES</div>
+              <div className="tdm-notes">{trade.openNotes || trade.notes}</div>
+            </div>
+          )}
+
+          {trade.closeNotes && (
+            <div className="tdm-section">
+              <div className="tdm-section-label">CLOSING NOTES</div>
+              <div className="tdm-notes">{trade.closeNotes}</div>
             </div>
           )}
         </div>
@@ -211,12 +218,7 @@ export default function TradeHistory({ history, onClear, onDelete, accountCurren
                       title="Delete trade"
                     >✕</button>
                   </div>
-                  {t.notes && (
-                    <div className="ht-notes">
-                      <span className="ht-notes-label">NOTE</span>
-                      <span className="ht-notes-text">{t.notes}</span>
-                    </div>
-                  )}
+
                 </React.Fragment>
               );
             })}

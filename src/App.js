@@ -98,7 +98,7 @@ export default function App() {
         tp: tradeData.tp,
         lotSize: tradeData.lotSize,
         openedAt,
-        notes: tradeData.notes || '',
+        openNotes: tradeData.notes || '',
         checklist: tradeData.checklist || [],
       });
     } catch (_) {}
@@ -119,7 +119,7 @@ export default function App() {
     setTab('trades');
   }, []);
 
-  const handleClose = useCallback((tradeId, closePrice, pips, plUsd, notes = '') => {
+  const handleClose = useCallback((tradeId, closePrice, pips, plUsd, closeNotes = '') => {
     setTrades(prev => {
       const trade = prev.find(t => t.id === tradeId);
       if (trade) {
@@ -131,7 +131,8 @@ export default function App() {
           closePrice,
           pips,
           plUsd,
-          notes,
+          openNotes: trade.openNotes || trade.notes || '',
+          closeNotes,
           closedAt,
         }, ...h]);
 
@@ -149,7 +150,9 @@ export default function App() {
           closePrice,
           pips,
           plUsd,
-          notes,
+          openNotes: trade.openNotes || trade.notes || '',
+          closeNotes,
+          checklist: trade.checklist || [],
         }).then(newId => {
           setHistory(h => h.map(e => e.id === tmpId ? { ...e, id: newId } : e));
         }).catch(() => {});
