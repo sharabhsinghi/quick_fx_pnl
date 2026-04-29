@@ -79,13 +79,6 @@ npm run dev
 # open http://localhost:3000
 ```
 
-## Deploying to GitHub Pages
-
-```bash
-npm run deploy
-```
-
-This builds the static export and pushes it to the `gh-pages` branch automatically.
 
 ---
 
