@@ -1,5 +1,7 @@
 
 
+import { getApiKey } from './lib/idb';
+
 export const PAIR_META = {
   EURUSD: { base: 'EUR', quote: 'USD', pipSize: 0.0001, display: 'EUR/USD' },
   GBPUSD: { base: 'GBP', quote: 'USD', pipSize: 0.0001, display: 'GBP/USD' },
@@ -39,8 +41,6 @@ export function getSupportedPairs() {
   return Object.values(PAIR_META).map(p => p.display);
 }
 
-const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || '';
-
 const _priceCache = new Map(); // pairKey -> { price, source, date, ts }
 const CACHE_TTL_MS = 60_000; // 1 minute
 
@@ -53,34 +53,35 @@ export async function fetchLivePrice(pairKey) {
     return { price: cached.price, source: cached.source, date: cached.date };
   }
 
-  let result = null;
-
-  // Try the server-side API route first (works when running as a Node.js server with an API key)
-  try {
-    const res = await fetch(`${BASE_PATH}/api/price?pair=${encodeURIComponent(pairKey)}`, {
-      signal: AbortSignal.timeout(10000),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      result = { price: data.price, source: data.source, date: data.date };
-    }
-  } catch (_) {}
-
-  if (!result) {
-    // Fallback: call frankfurter.app directly from the browser.
-    // Used in static deployments (GitHub Pages) where API routes don't exist.
-    const r = await fetch(
-      `https://api.frankfurter.app/latest?from=${meta.base}&to=${meta.quote}`,
-      { signal: AbortSignal.timeout(8000) }
-    );
-    if (!r.ok) throw new Error('Price feed unavailable. Check your connection.');
-    const data = await r.json();
-    const rate = data.rates?.[meta.quote];
-    if (!rate) throw new Error('Rate not in response');
-    result = { price: rate, source: 'frankfurter.app (ECB)', date: data.date };
+  // Try Twelve Data if the user has stored an API key
+  const apiKey = await getApiKey();
+  if (apiKey) {
+    try {
+      const r = await fetch(
+        `https://api.twelvedata.com/exchange_rate?apikey=${apiKey}&symbol=${encodeURIComponent(meta.display)}`,
+        { signal: AbortSignal.timeout(8000) }
+      );
+      if (r.ok) {
+        const data = await r.json();
+        if (data?.rate) {
+          const result = { price: data.rate, source: 'twelvedata.com', date: new Date().toISOString().split('T')[0] };
+          _priceCache.set(pairKey, { ...result, ts: Date.now() });
+          return result;
+        }
+      }
+    } catch (_) {}
   }
 
-  if (!result) throw new Error('Price feed unavailable. Check your connection.');
+  // Fallback: frankfurter.app (ECB, no key needed)
+  const r = await fetch(
+    `https://api.frankfurter.app/latest?from=${meta.base}&to=${meta.quote}`,
+    { signal: AbortSignal.timeout(8000) }
+  );
+  if (!r.ok) throw new Error('Price feed unavailable. Check your connection.');
+  const data = await r.json();
+  const rate = data.rates?.[meta.quote];
+  if (!rate) throw new Error('Rate not in response');
+  const result = { price: rate, source: 'frankfurter.app (ECB)', date: data.date };
   _priceCache.set(pairKey, { ...result, ts: Date.now() });
   return result;
 }

@@ -6,9 +6,13 @@ import TradeHistory from './components/TradeHistory';
 import SettingsModal from './components/SettingsModal';
 import Analytics from './components/Analytics';
 import { fetchUsdRate, formatPL } from './priceService';
+import {
+  getTrades, addTrade, deleteTrade,
+  getHistory, addHistory, deleteHistory, clearHistory as clearHistoryIdb,
+  getSettings, saveSettings,
+} from './lib/idb';
 
 const TABS = ['trades', 'calculators', 'history', 'analytics'];
-const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || '';
 
 export default function App() {
   const [tab, setTab] = useState('trades');
@@ -43,18 +47,26 @@ export default function App() {
   const THEME_ICON  = { dark: '◐', light: '◑', system: '◎' };
   const THEME_LABEL = { dark: 'Dark mode', light: 'Light mode', system: 'System theme' };
 
-  // Load persisted trades, history, and settings from SQLite on mount
+  // Load persisted trades, history, and settings from IndexedDB on mount
   useEffect(() => {
     async function loadData() {
       try {
-        const [tradesRes, historyRes, settingsRes] = await Promise.all([
-          fetch(`${BASE_PATH}/api/trades`),
-          fetch(`${BASE_PATH}/api/history`),
-          fetch(`${BASE_PATH}/api/settings`),
+        const [tradesData, historyData, settingsData] = await Promise.all([
+          getTrades(),
+          getHistory(),
+          getSettings(),
         ]);
-        if (tradesRes.ok) setTrades(await tradesRes.json());
-        if (historyRes.ok) setHistory(await historyRes.json());
-        if (settingsRes.ok) setAccountSettings(await settingsRes.json());
+        setTrades(tradesData.map(t => ({
+          ...t,
+          livePrice: null,
+          pips: null,
+          plUsd: null,
+          lastUpdated: null,
+          error: null,
+          loading: false,
+        })));
+        setHistory(historyData);
+        setAccountSettings(settingsData);
       } catch (_) {}
     }
     loadData();
@@ -68,41 +80,27 @@ export default function App() {
   const handleSaveSettings = useCallback(async (newSettings) => {
     setAccountSettings(newSettings);
     setShowSettings(false);
-    try {
-      await fetch(`${BASE_PATH}/api/settings`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newSettings),
-      });
-    } catch (_) {}
+    saveSettings(newSettings).catch(() => {});
   }, []);
 
   const handleOpen = useCallback(async (tradeData) => {
     const openedAt = tradeData.openDate
       ? new Date(tradeData.openDate + 'T00:00:00').toISOString()
       : new Date().toISOString();
-    let id = Date.now(); // fallback id if API is unavailable
+    let id = Date.now(); // fallback id
     try {
-      const res = await fetch(`${BASE_PATH}/api/trades`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          key: tradeData.key,
-          meta: tradeData.meta,
-          side: tradeData.side,
-          entry: tradeData.entry,
-          sl: tradeData.sl,
-          tp: tradeData.tp,
-          lotSize: tradeData.lotSize,
-          openedAt,
-          notes: tradeData.notes || '',
-          checklist: tradeData.checklist || [],
-        }),
+      id = await addTrade({
+        key: tradeData.key,
+        meta: tradeData.meta,
+        side: tradeData.side,
+        entry: tradeData.entry,
+        sl: tradeData.sl,
+        tp: tradeData.tp,
+        lotSize: tradeData.lotSize,
+        openedAt,
+        notes: tradeData.notes || '',
+        checklist: tradeData.checklist || [],
       });
-      if (res.ok) {
-        const data = await res.json();
-        id = data.id;
-      }
     } catch (_) {}
 
     setTrades(prev => [...prev, {
@@ -126,8 +124,10 @@ export default function App() {
       const trade = prev.find(t => t.id === tradeId);
       if (trade) {
         const closedAt = new Date().toISOString();
+        const tmpId = `tmp_${Date.now()}`;
         setHistory(h => [{
           ...trade,
+          id: tmpId,
           closePrice,
           pips,
           plUsd,
@@ -135,26 +135,23 @@ export default function App() {
           closedAt,
         }, ...h]);
 
-        // Persist: remove open trade, add to history (fire-and-forget)
-        fetch(`${BASE_PATH}/api/trades/${tradeId}`, { method: 'DELETE' }).catch(() => {});
-        fetch(`${BASE_PATH}/api/history`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            key: trade.key,
-            meta: trade.meta,
-            side: trade.side,
-            entry: trade.entry,
-            sl: trade.sl,
-            tp: trade.tp,
-            lotSize: trade.lotSize,
-            openedAt: trade.openedAt,
-            closedAt,
-            closePrice,
-            pips,
-            plUsd,
-            notes,
-          }),
+        deleteTrade(tradeId).catch(() => {});
+        addHistory({
+          key: trade.key,
+          meta: trade.meta,
+          side: trade.side,
+          entry: trade.entry,
+          sl: trade.sl,
+          tp: trade.tp,
+          lotSize: trade.lotSize,
+          openedAt: trade.openedAt,
+          closedAt,
+          closePrice,
+          pips,
+          plUsd,
+          notes,
+        }).then(newId => {
+          setHistory(h => h.map(e => e.id === tmpId ? { ...e, id: newId } : e));
         }).catch(() => {});
       }
       return prev.filter(t => t.id !== tradeId);
@@ -166,12 +163,12 @@ export default function App() {
   }, []);
 
   const clearHistory = useCallback(() => {
-    fetch(`${BASE_PATH}/api/history`, { method: 'DELETE' }).catch(() => {});
+    clearHistoryIdb().catch(() => {});
     setHistory([]);
   }, []);
 
   const deleteHistoryEntry = useCallback((id) => {
-    fetch(`${BASE_PATH}/api/history?id=${id}`, { method: 'DELETE' }).catch(() => {});
+    deleteHistory(id).catch(() => {});
     setHistory(prev => prev.filter(t => t.id !== id));
   }, []);
 

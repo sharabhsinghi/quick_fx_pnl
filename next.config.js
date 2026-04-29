@@ -3,6 +3,7 @@ const REPO = '/quick_fx_pnl';
 const isProd = process.env.NODE_ENV === 'production';
 
 const nextConfig = {
+  output: 'export',
   reactStrictMode: true,
   basePath: isProd ? REPO : '',
   images: { unoptimized: true },

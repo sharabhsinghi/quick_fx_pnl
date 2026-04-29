@@ -1,16 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { formatPL, getCurrencySymbol } from '../priceService';
+import { getApiKey, saveApiKey } from '../lib/idb';
 
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF', 'NZD', 'SGD', 'HKD'];
 
 export default function SettingsModal({ settings, onSave, onCancel }) {
   const [size, setSize] = useState(String(settings.size));
   const [currency, setCurrency] = useState(settings.currency);
+  const [apiKey, setApiKey] = useState('');
+  const [showKey, setShowKey] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSave = () => {
+  useEffect(() => {
+    getApiKey().then(setApiKey).catch(() => {});
+  }, []);
+
+  const handleSave = async () => {
     const sizeN = parseFloat(size);
     if (isNaN(sizeN) || sizeN < 0) { setError('Account size must be a positive number.'); return; }
+    await saveApiKey(apiKey.trim());
     onSave({ size: sizeN, currency });
   };
 
@@ -51,6 +59,32 @@ export default function SettingsModal({ settings, onSave, onCancel }) {
                 {formatPL(parseFloat(size), currency)} {currency}
               </div>
             )}
+          </div>
+
+          <div className="sm-field">
+            <label className="sm-label">
+              TWELVE DATA API KEY
+              <span className="sm-hint"> · optional · stored locally in browser</span>
+            </label>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input
+                className="sm-input"
+                type={showKey ? 'text' : 'password'}
+                value={apiKey}
+                onChange={e => setApiKey(e.target.value)}
+                placeholder="Leave blank to use free ECB rates"
+                autoComplete="off"
+              />
+              <button
+                className="sm-x"
+                style={{ flexShrink: 0, width: 36, border: '1px solid var(--border)', borderRadius: 2 }}
+                onClick={() => setShowKey(v => !v)}
+                type="button"
+                title={showKey ? 'Hide key' : 'Show key'}
+              >
+                {showKey ? '○' : '●'}
+              </button>
+            </div>
           </div>
 
           {error && <div className="sm-error">⚠ {error}</div>}
