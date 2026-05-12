@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef } from 'react';
 import TradeCard from './TradeCard';
 import { formatPL } from '../priceService';
 
-export default function Dashboard({ trades, onAddTrade, onClose, onUpdate, accountCurrency = 'USD', accountSize = 0, usdRate = 1 }) {
+export default function Dashboard({ trades, onAddTrade, onClose, onUpdate, onEdit, accountCurrency = 'USD', accountSize = 0, usdRate = 1 }) {
   const totalPL = trades.reduce((s, t) => s + (t.plUsd || 0), 0);
   const totalPLAccount = totalPL * usdRate;
   const totalPips = trades.reduce((s, t) => s + (t.pips || 0), 0);
@@ -37,6 +37,7 @@ export default function Dashboard({ trades, onAddTrade, onClose, onUpdate, accou
             trade={trade}
             onClose={onClose}
             onUpdate={onUpdate}
+            onEdit={onEdit}
             accountCurrency={accountCurrency}
             accountSize={accountSize}
             usdRate={usdRate}

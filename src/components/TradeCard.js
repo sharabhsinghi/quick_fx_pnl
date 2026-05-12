@@ -5,9 +5,14 @@ import CloseTradeModal from './CloseTradeModal';
 const AUTO_INTERVALS = [0, 30, 60, 300]; // seconds; 0 = off
 const INTERVAL_LABELS = ['Off', '30s', '1m', '5m'];
 
-export default function TradeCard({ trade, onClose, onUpdate, accountCurrency = 'USD', accountSize = 0, usdRate = 1 }) {
+export default function TradeCard({ trade, onClose, onUpdate, onEdit, accountCurrency = 'USD', accountSize = 0, usdRate = 1 }) {
   const [autoIdx, setAutoIdx] = useState(0);
   const [showCloseModal, setShowCloseModal] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [editSl, setEditSl] = useState('');
+  const [editTp, setEditTp] = useState('');
+  const [editNotes, setEditNotes] = useState('');
+  const [editError, setEditError] = useState('');
   const timerRef = useRef(null);
 
   const refresh = useCallback(async () => {
@@ -53,6 +58,47 @@ export default function TradeCard({ trade, onClose, onUpdate, accountCurrency = 
     onClose(tradeId, closePrice, pips, plUsd, notes);
   };
 
+  const openEditMode = () => {
+    setEditSl(String(trade.sl ?? ''));
+    setEditTp(String(trade.tp ?? ''));
+    setEditNotes(trade.notes || '');
+    setEditError('');
+    setEditMode(true);
+  };
+
+  const cancelEdit = () => {
+    setEditMode(false);
+    setEditError('');
+  };
+
+  const saveEdit = () => {
+    setEditError('');
+    const slN = parseFloat(editSl);
+    const tpN = parseFloat(editTp);
+    if (isNaN(slN) || isNaN(tpN)) {
+      setEditError('SL and TP must be valid numbers.');
+      return;
+    }
+    if (trade.side === 'buy' && slN >= trade.entry) {
+      setEditError('BUY: Stop Loss must be below Entry.');
+      return;
+    }
+    if (trade.side === 'buy' && tpN <= trade.entry) {
+      setEditError('BUY: Take Profit must be above Entry.');
+      return;
+    }
+    if (trade.side === 'sell' && slN <= trade.entry) {
+      setEditError('SELL: Stop Loss must be above Entry.');
+      return;
+    }
+    if (trade.side === 'sell' && tpN >= trade.entry) {
+      setEditError('SELL: Take Profit must be below Entry.');
+      return;
+    }
+    onEdit(trade.id, { sl: slN, tp: tpN, notes: editNotes });
+    setEditMode(false);
+  };
+
   const rr = calcRR({ entry: trade.entry, sl: trade.sl, tp: trade.tp, side: trade.side });
   const profitable = trade.plUsd != null && trade.plUsd >= 0;
   const hasData = trade.livePrice != null;
@@ -94,6 +140,7 @@ export default function TradeCard({ trade, onClose, onUpdate, accountCurrency = 
         <div className={`tc-side ${trade.side}`}>
           {trade.side === 'buy' ? '▲' : '▼'} {trade.side.toUpperCase()}
         </div>
+        {editMode && <div className="tc-edit-badge">EDITING</div>}
         <div className={`tc-dot ${trade.loading ? 'loading' : 'live'}`} />
       </div>
 
@@ -117,23 +164,54 @@ export default function TradeCard({ trade, onClose, onUpdate, accountCurrency = 
         <div className={`tc-progress-fill ${progressDir}`} style={{ width: `${progress}%` }} />
       </div>
 
-      {/* Price levels */}
-      <div className="tc-levels">
-        <div className="tc-level">
-          <span className="tl-label">SL</span>
-          <span className="tl-val red">{formatPrice(trade.sl, trade.meta.pipSize)}</span>
+      {/* Price levels — editable SL/TP in edit mode */}
+      {editMode ? (
+        <div className="tc-edit-levels">
+          <div className="tc-edit-field">
+            <label className="tc-edit-label">SL</label>
+            <input
+              className="tc-edit-input sl"
+              type="number"
+              step="any"
+              value={editSl}
+              onChange={e => setEditSl(e.target.value)}
+            />
+          </div>
+          <div className="tc-edit-field center">
+            <span className="tl-label">NOW</span>
+            <span className="tl-val">
+              {hasData ? formatPrice(trade.livePrice, trade.meta.pipSize) : '—'}
+            </span>
+          </div>
+          <div className="tc-edit-field right">
+            <label className="tc-edit-label">TP</label>
+            <input
+              className="tc-edit-input tp"
+              type="number"
+              step="any"
+              value={editTp}
+              onChange={e => setEditTp(e.target.value)}
+            />
+          </div>
         </div>
-        <div className="tc-level center">
-          <span className="tl-label">NOW</span>
-          <span className="tl-val">
-            {hasData ? formatPrice(trade.livePrice, trade.meta.pipSize) : '—'}
-          </span>
+      ) : (
+        <div className="tc-levels">
+          <div className="tc-level">
+            <span className="tl-label">SL</span>
+            <span className="tl-val red">{formatPrice(trade.sl, trade.meta.pipSize)}</span>
+          </div>
+          <div className="tc-level center">
+            <span className="tl-label">NOW</span>
+            <span className="tl-val">
+              {hasData ? formatPrice(trade.livePrice, trade.meta.pipSize) : '—'}
+            </span>
+          </div>
+          <div className="tc-level right">
+            <span className="tl-label">TP</span>
+            <span className="tl-val green">{formatPrice(trade.tp, trade.meta.pipSize)}</span>
+          </div>
         </div>
-        <div className="tc-level right">
-          <span className="tl-label">TP</span>
-          <span className="tl-val green">{formatPrice(trade.tp, trade.meta.pipSize)}</span>
-        </div>
-      </div>
+      )}
 
       {/* Meta row */}
       <div className="tc-meta">
@@ -145,28 +223,54 @@ export default function TradeCard({ trade, onClose, onUpdate, accountCurrency = 
       </div>
 
       {trade.error && <div className="tc-error">⚠ {trade.error}</div>}
-      {trade.notes && <div className="tc-notes">{trade.notes}</div>}
-      {trade.lastUpdated && (
+
+      {/* Notes — editable textarea in edit mode */}
+      {editMode ? (
+        <div className="tc-edit-notes-wrap">
+          <label className="tc-edit-label">NOTES</label>
+          <textarea
+            className="tc-edit-notes"
+            value={editNotes}
+            onChange={e => setEditNotes(e.target.value)}
+            rows={3}
+            placeholder="Trade rationale, setup notes…"
+          />
+        </div>
+      ) : (
+        trade.notes && <div className="tc-notes">{trade.notes}</div>
+      )}
+
+      {editError && <div className="tc-error">⚠ {editError}</div>}
+
+      {trade.lastUpdated && !editMode && (
         <div className="tc-updated">Updated {trade.lastUpdated.toLocaleTimeString()}</div>
       )}
 
       {/* Actions */}
-      <div className="tc-actions">
-        <button className={`tc-btn-refresh ${trade.loading ? 'spinning' : ''}`} onClick={refresh} disabled={trade.loading}>
-          ↻
-        </button>
+      {editMode ? (
+        <div className="tc-actions">
+          <button className="tc-btn-confirm" onClick={saveEdit}>✓ SAVE</button>
+          <button className="tc-btn-cancel" onClick={cancelEdit}>✕ CANCEL</button>
+        </div>
+      ) : (
+        <div className="tc-actions">
+          <button className={`tc-btn-refresh ${trade.loading ? 'spinning' : ''}`} onClick={refresh} disabled={trade.loading}>
+            ↻
+          </button>
 
-        {/* Auto-refresh cycle */}
-        <button
-          className={`tc-btn-auto ${autoIdx > 0 ? 'active' : ''}`}
-          onClick={() => setAutoIdx(i => (i + 1) % AUTO_INTERVALS.length)}
-          title="Auto-refresh interval"
-        >
-          AUTO: {INTERVAL_LABELS[autoIdx]}
-        </button>
+          {/* Auto-refresh cycle */}
+          <button
+            className={`tc-btn-auto ${autoIdx > 0 ? 'active' : ''}`}
+            onClick={() => setAutoIdx(i => (i + 1) % AUTO_INTERVALS.length)}
+            title="Auto-refresh interval"
+          >
+            AUTO: {INTERVAL_LABELS[autoIdx]}
+          </button>
 
-        <button className="tc-btn-close" onClick={() => setShowCloseModal(true)}>✕ CLOSE</button>
-      </div>
+          <button className="tc-btn-edit" onClick={openEditMode}>✎ EDIT</button>
+          <button className="tc-btn-close" onClick={() => setShowCloseModal(true)}>✕ CLOSE</button>
+        </div>
+      )}
     </div>
   );
 }

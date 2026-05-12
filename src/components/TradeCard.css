@@ -170,7 +170,96 @@
 .tc-btn-close:hover { color: var(--red); background: var(--red-dim); }
 .tc-btn-close { border-right: none; }
 
-.tc-btn-confirm { color: var(--red); border-right: 1px solid var(--border); }
-.tc-btn-confirm:hover { background: var(--red-dim); }
-.tc-btn-cancel:hover { background: var(--bg-2); color: var(--text); }
-.tc-btn-cancel { border-right: none; }
+/* Edit mode */
+.tc-edit-badge {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--amber);
+  background: var(--amber-dim);
+  border: 1px solid rgba(255,180,0,0.25);
+  padding: 2px 7px;
+  border-radius: 2px;
+}
+
+.tc-edit-levels {
+  display: flex;
+  padding: 4px 16px 8px;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.tc-edit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+.tc-edit-field.center { align-items: center; }
+.tc-edit-field.right { align-items: flex-end; }
+
+.tc-edit-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+}
+
+.tc-edit-input {
+  width: 100%;
+  height: 32px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 0 8px;
+  transition: border-color 0.15s;
+}
+.tc-edit-input:focus { outline: none; }
+.tc-edit-input.sl:focus { border-color: var(--red); }
+.tc-edit-input.tp:focus { border-color: var(--green); }
+
+.tc-edit-notes-wrap {
+  margin: 0 16px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tc-edit-notes {
+  width: 100%;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 8px;
+  resize: vertical;
+  line-height: 1.5;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+.tc-edit-notes:focus { outline: none; border-color: var(--amber); }
+.tc-edit-notes::placeholder { color: var(--text-dim); }
+
+.tc-btn-confirm { color: var(--green); border-right: 1px solid var(--border); }
+.tc-btn-confirm:hover { background: var(--green-dim); }
+
+.tc-btn-edit {
+  flex: 1;
+  height: 38px;
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.tc-btn-edit:hover { color: var(--amber); background: var(--amber-dim); }
