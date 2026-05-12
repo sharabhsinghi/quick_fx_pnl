@@ -2,11 +2,16 @@ import React, { useState } from 'react';
 import PipCalculator from './PipCalculator';
 import PLCalculator from './PLCalculator';
 
-export default function Calculators({ trades, onOpen, accountCurrency, accountSize, usdRate }) {
+export default function Calculators({ trades, onOpen, onOpenForm, accountCurrency, accountSize, usdRate }) {
   const [active, setActive] = useState(null); // null | 'pip' | 'pl'
 
   const handleOpenTrade = (data) => {
     onOpen(data);
+    setActive(null);
+  };
+
+  const handleOpenTradeForm = (data) => {
+    onOpenForm(data);
     setActive(null);
   };
 
@@ -55,7 +60,7 @@ export default function Calculators({ trades, onOpen, accountCurrency, accountSi
           <button className="calcs-back-btn" onClick={() => setActive(null)}>← BACK TO CALCULATORS</button>
           <PLCalculator
             trades={trades}
-            onOpen={handleOpenTrade}
+            onOpenForm={handleOpenTradeForm}
             accountCurrency={accountCurrency}
             accountSize={accountSize}
             usdRate={usdRate}

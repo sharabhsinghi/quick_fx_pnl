@@ -19,7 +19,7 @@ function autoSlTp(entry, side, pipSize) {
   return { sl, tp };
 }
 
-export default function PLCalculator({ trades = [], onOpen, accountCurrency = 'USD', accountSize = 0, usdRate = 1 }) {
+export default function PLCalculator({ trades = [], onOpenForm, accountCurrency = 'USD', accountSize = 0, usdRate = 1 }) {
   const [pair, setPair]         = useState('EUR/USD');
   const [side, setSide]         = useState('buy');
   const [entry, setEntry]       = useState('');
@@ -136,11 +136,9 @@ export default function PLCalculator({ trades = [], onOpen, accountCurrency = 'U
     if (side === 'buy'  && tpN <= entryN) { setOpenError('BUY: Take Profit must be above Entry.'); return; }
     if (side === 'sell' && slN <= entryN) { setOpenError('SELL: Stop Loss must be above Entry.'); return; }
     if (side === 'sell' && tpN >= entryN) { setOpenError('SELL: Take Profit must be below Entry.'); return; }
-    onOpen({
+    onOpenForm({
       key: pairKey, meta: pairMeta, side,
       entry: entryN, sl: slN, tp: tpN, lotSize: lotN,
-      notes: '',
-      openDate: new Date().toISOString().slice(0, 10),
     });
   };
 
@@ -299,7 +297,7 @@ export default function PLCalculator({ trades = [], onOpen, accountCurrency = 'U
             <div className="plc-actions">
               {openError && <div className="plc-open-error">⚠ {openError}</div>}
               <button className="plc-open-btn" onClick={handleOpenTrade}>
-                OPEN TRADE WITH THESE INPUTS →
+                OPEN TRADE FORM WITH THESE INPUTS →
               </button>
             </div>
           </div>
