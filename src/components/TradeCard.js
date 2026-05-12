@@ -59,8 +59,8 @@ export default function TradeCard({ trade, onClose, onUpdate, onEdit, accountCur
   };
 
   const openEditMode = () => {
-    setEditSl(String(trade.sl));
-    setEditTp(String(trade.tp));
+    setEditSl(String(trade.sl ?? ''));
+    setEditTp(String(trade.tp ?? ''));
     setEditNotes(trade.notes || '');
     setEditError('');
     setEditMode(true);
@@ -75,11 +75,26 @@ export default function TradeCard({ trade, onClose, onUpdate, onEdit, accountCur
     setEditError('');
     const slN = parseFloat(editSl);
     const tpN = parseFloat(editTp);
-    if (isNaN(slN) || isNaN(tpN)) { setEditError('SL and TP must be valid numbers.'); return; }
-    if (trade.side === 'buy' && slN >= trade.entry) { setEditError('BUY: Stop Loss must be below Entry.'); return; }
-    if (trade.side === 'buy' && tpN <= trade.entry) { setEditError('BUY: Take Profit must be above Entry.'); return; }
-    if (trade.side === 'sell' && slN <= trade.entry) { setEditError('SELL: Stop Loss must be above Entry.'); return; }
-    if (trade.side === 'sell' && tpN >= trade.entry) { setEditError('SELL: Take Profit must be below Entry.'); return; }
+    if (isNaN(slN) || isNaN(tpN)) {
+      setEditError('SL and TP must be valid numbers.');
+      return;
+    }
+    if (trade.side === 'buy' && slN >= trade.entry) {
+      setEditError('BUY: Stop Loss must be below Entry.');
+      return;
+    }
+    if (trade.side === 'buy' && tpN <= trade.entry) {
+      setEditError('BUY: Take Profit must be above Entry.');
+      return;
+    }
+    if (trade.side === 'sell' && slN <= trade.entry) {
+      setEditError('SELL: Stop Loss must be above Entry.');
+      return;
+    }
+    if (trade.side === 'sell' && tpN >= trade.entry) {
+      setEditError('SELL: Take Profit must be below Entry.');
+      return;
+    }
     onEdit(trade.id, { sl: slN, tp: tpN, notes: editNotes });
     setEditMode(false);
   };
