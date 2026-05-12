@@ -7,7 +7,7 @@ import SettingsModal from './components/SettingsModal';
 import Analytics from './components/Analytics';
 import { fetchUsdRate, formatPL } from './priceService';
 import {
-  getTrades, addTrade, deleteTrade,
+  getTrades, addTrade, deleteTrade, updateTrade as updateTradeIdb,
   getHistory, addHistory, deleteHistory, clearHistory as clearHistoryIdb,
   getSettings, saveSettings,
 } from './lib/idb';
@@ -165,6 +165,11 @@ export default function App() {
     setTrades(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
   }, []);
 
+  const handleEditTrade = useCallback((id, { sl, tp, notes }) => {
+    setTrades(prev => prev.map(t => t.id === id ? { ...t, sl, tp, notes } : t));
+    updateTradeIdb(id, { sl, tp, notes }).catch(() => {});
+  }, []);
+
   const clearHistory = useCallback(() => {
     clearHistoryIdb().catch(() => {});
     setHistory([]);
@@ -230,6 +235,7 @@ export default function App() {
                 onAddTrade={() => setShowForm(true)}
                 onClose={handleClose}
                 onUpdate={updateTrade}
+                onEdit={handleEditTrade}
                 accountCurrency={accountCurrency}
                 accountSize={accountSize}
                 usdRate={usdRate}

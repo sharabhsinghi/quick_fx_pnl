@@ -56,6 +56,15 @@ export async function deleteTrade(id) {
   return wrap(tx.objectStore('trades').delete(id));
 }
 
+export async function updateTrade(id, updates) {
+  const db = await openDb();
+  const tx = db.transaction('trades', 'readwrite');
+  const store = tx.objectStore('trades');
+  const existing = await wrap(store.get(id));
+  if (!existing) return;
+  return wrap(store.put({ ...existing, ...updates }));
+}
+
 export async function getHistory() {
   const db = await openDb();
   const tx = db.transaction('history', 'readonly');
