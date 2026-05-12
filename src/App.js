@@ -19,6 +19,7 @@ export default function App() {
   const [trades, setTrades] = useState([]);
   const [history, setHistory] = useState([]);
   const [showForm, setShowForm] = useState(false);
+  const [tradeFormInitialValues, setTradeFormInitialValues] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [accountSettings, setAccountSettings] = useState({ size: 10000, currency: 'USD' });
   const [usdRate, setUsdRate] = useState(1);
@@ -115,7 +116,14 @@ export default function App() {
       error: null,
       loading: false,
     }]);
+    setTradeFormInitialValues(null);
     setShowForm(false);
+    setTab('trades');
+  }, []);
+
+  const handleOpenForm = useCallback((initialValues) => {
+    setTradeFormInitialValues(initialValues);
+    setShowForm(true);
     setTab('trades');
   }, []);
 
@@ -180,6 +188,11 @@ export default function App() {
     setHistory(prev => prev.filter(t => t.id !== id));
   }, []);
 
+  const handleCancelForm = useCallback(() => {
+    setShowForm(false);
+    setTradeFormInitialValues(null);
+  }, []);
+
   const totalPL = trades.reduce((sum, t) => sum + (t.plUsd || 0), 0);
   const totalPLAccount = totalPL * usdRate;
   const { currency: accountCurrency, size: accountSize } = accountSettings;
@@ -229,7 +242,7 @@ export default function App() {
       <main className="app-main">
         {tab === 'trades' && (
           showForm
-            ? <TradeForm onOpen={handleOpen} onCancel={() => setShowForm(false)} />
+            ? <TradeForm onOpen={handleOpen} onCancel={handleCancelForm} initialValues={tradeFormInitialValues} />
             : <Dashboard
                 trades={trades}
                 onAddTrade={() => setShowForm(true)}
@@ -241,7 +254,7 @@ export default function App() {
                 usdRate={usdRate}
               />
         )}
-        {tab === 'calculators' && <Calculators trades={trades} onOpen={handleOpen} accountCurrency={accountCurrency} accountSize={accountSize} usdRate={usdRate} />}
+        {tab === 'calculators' && <Calculators trades={trades} onOpen={handleOpen} onOpenForm={handleOpenForm} accountCurrency={accountCurrency} accountSize={accountSize} usdRate={usdRate} />}
         {tab === 'history' && <TradeHistory history={history} onClear={clearHistory} onDelete={deleteHistoryEntry} accountCurrency={accountCurrency} accountSize={accountSize} usdRate={usdRate} />}
         {tab === 'analytics' && <Analytics history={history} accountCurrency={accountCurrency} accountSize={accountSize} usdRate={usdRate} />}
       </main>

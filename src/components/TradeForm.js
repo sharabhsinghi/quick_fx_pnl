@@ -25,20 +25,22 @@ function computeAutoSlTp(entryPrice, side, pipSize) {
   return { sl: (entryPrice + slDist).toFixed(dec), tp: (entryPrice - tpDist).toFixed(dec) };
 }
 
-export default function TradeForm({ onOpen, onCancel }) {
-  const [pair, setPair] = useState('');
-  const [side, setSide] = useState('buy');
-  const [entry, setEntry] = useState('');
-  const [sl, setSl] = useState('');
-  const [tp, setTp] = useState('');
-  const [lotSize, setLotSize] = useState('10000');
+export default function TradeForm({ onOpen, onCancel, initialValues = null }) {
+  const [pair, setPair] = useState(initialValues?.meta?.display || initialValues?.key || '');
+  const [side, setSide] = useState(initialValues?.side || 'buy');
+  const [entry, setEntry] = useState(initialValues?.entry !== undefined ? String(initialValues.entry) : '');
+  const [sl, setSl] = useState(initialValues?.sl !== undefined ? String(initialValues.sl) : '');
+  const [tp, setTp] = useState(initialValues?.tp !== undefined ? String(initialValues.tp) : '');
+  const [lotSize, setLotSize] = useState(initialValues?.lotSize !== undefined ? String(initialValues.lotSize) : '10000');
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState('');
   const [checklist, setChecklist] = useState(Array(CHECKLIST_ITEMS.length).fill(false));
   const [error, setError] = useState('');
   const [priceLoading, setPriceLoading] = useState(false);
   // Track if user manually edited SL or TP; reset when entry is (re)autofilled
-  const slTpManual = useRef(false);
+  const slTpManual = useRef(!!(initialValues?.sl || initialValues?.tp));
+  // Skip the initial live-price auto-fetch when values are pre-filled from the estimator
+  const skipInitialFetch = useRef(!!(initialValues?.entry));
 
   const pairKey = normalizePair(pair);
   const pairMeta = getPairMeta(pairKey);
@@ -46,6 +48,8 @@ export default function TradeForm({ onOpen, onCancel }) {
   // Fetch live price when a valid pair is selected and autofill entry + SL/TP
   useEffect(() => {
     if (!pairMeta) return;
+    // Skip auto-fetch on mount when entry is pre-filled from the P/L estimator
+    if (skipInitialFetch.current) { skipInitialFetch.current = false; return; }
     let cancelled = false;
     setPriceLoading(true);
     fetchLivePrice(pairKey)
