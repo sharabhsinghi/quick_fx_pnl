@@ -13,6 +13,9 @@ export default function TradeCard({ trade, onClose, onUpdate, onEdit, accountCur
   const [editTp, setEditTp] = useState('');
   const [editNotes, setEditNotes] = useState('');
   const [editError, setEditError] = useState('');
+  const [showNotesModal, setShowNotesModal] = useState(false);
+  const [notesModalEdit, setNotesModalEdit] = useState(false);
+  const [notesModalText, setNotesModalText] = useState('');
   const timerRef = useRef(null);
 
   const refresh = useCallback(async () => {
@@ -66,6 +69,23 @@ export default function TradeCard({ trade, onClose, onUpdate, onEdit, accountCur
     setEditMode(true);
   };
 
+  const openNotesModal = () => {
+    setNotesModalText(trade.notes || '');
+    setNotesModalEdit(false);
+    setShowNotesModal(true);
+  };
+
+  const closeNotesModal = () => {
+    setShowNotesModal(false);
+    setNotesModalEdit(false);
+  };
+
+  const saveNotesModal = () => {
+    onEdit(trade.id, { sl: trade.sl, tp: trade.tp, notes: notesModalText });
+    setShowNotesModal(false);
+    setNotesModalEdit(false);
+  };
+
   const cancelEdit = () => {
     setEditMode(false);
     setEditError('');
@@ -98,6 +118,15 @@ export default function TradeCard({ trade, onClose, onUpdate, onEdit, accountCur
     onEdit(trade.id, { sl: slN, tp: tpN, notes: editNotes });
     setEditMode(false);
   };
+
+  const NOTES_CHAR_LIMIT = 100;
+  const notesLong = trade.notes && (
+    trade.notes.length > NOTES_CHAR_LIMIT ||
+    (trade.notes.match(/\n/g) || []).length >= 2
+  );
+  const notesPreview = notesLong
+    ? trade.notes.slice(0, NOTES_CHAR_LIMIT).trimEnd() + '…'
+    : trade.notes;
 
   const rr = calcRR({ entry: trade.entry, sl: trade.sl, tp: trade.tp, side: trade.side });
   const profitable = trade.plUsd != null && trade.plUsd >= 0;
@@ -237,7 +266,48 @@ export default function TradeCard({ trade, onClose, onUpdate, onEdit, accountCur
           />
         </div>
       ) : (
-        trade.notes && <div className="tc-notes">{trade.notes}</div>
+        trade.notes && (
+          <div className="tc-notes">
+            {notesPreview}
+            {notesLong && (
+              <button className="tc-notes-seemore" onClick={openNotesModal}>see more</button>
+            )}
+          </div>
+        )
+      )}
+
+      {showNotesModal && (
+        <div className="notes-modal-overlay" onClick={closeNotesModal}>
+          <div className="notes-modal" onClick={e => e.stopPropagation()}>
+            <div className="notes-modal-header">
+              <span className="notes-modal-title">NOTES — {trade.meta.display}</span>
+              <div className="notes-modal-actions">
+                {notesModalEdit ? (
+                  <>
+                    <button className="notes-modal-btn save" onClick={saveNotesModal}>✓ SAVE</button>
+                    <button className="notes-modal-btn cancel" onClick={() => { setNotesModalEdit(false); setNotesModalText(trade.notes || ''); }}>✕ CANCEL</button>
+                  </>
+                ) : (
+                  <button className="notes-modal-btn edit" onClick={() => setNotesModalEdit(true)}>✎ EDIT</button>
+                )}
+                <button className="notes-modal-btn close" onClick={closeNotesModal}>✕</button>
+              </div>
+            </div>
+            <div className="notes-modal-body">
+              {notesModalEdit ? (
+                <textarea
+                  className="notes-modal-textarea"
+                  value={notesModalText}
+                  onChange={e => setNotesModalText(e.target.value)}
+                  placeholder="Trade rationale, setup notes…"
+                  autoFocus
+                />
+              ) : (
+                <div className="notes-modal-text">{notesModalText}</div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {editError && <div className="tc-error">⚠ {editError}</div>}
