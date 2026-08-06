@@ -11,6 +11,7 @@ import '../components/SettingsModal.css';
 import '../components/Analytics.css';
 import '../components/Calculators.css';
 import '../components/PLCalculator.css';
+import '../components/TradingWizard.css';
 
 export default function MyApp({ Component, pageProps }) {
   return (
