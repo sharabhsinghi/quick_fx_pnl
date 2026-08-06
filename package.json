@@ -15,9 +15,22 @@
     "start": "next dev",
     "lint": "next lint",
     "predeploy": "next build && touch out/.nojekyll",
-    "deploy": "gh-pages -d out --dotfiles"
+    "deploy": "gh-pages -d out --dotfiles",
+    "test": "jest"
   },
   "devDependencies": {
-    "gh-pages": "^6.0.0"
+    "@babel/core": "^8.0.1",
+    "@babel/preset-env": "^8.0.2",
+    "@babel/preset-react": "^8.0.1",
+    "babel-jest": "^30.4.1",
+    "gh-pages": "^6.0.0",
+    "jest": "^30.4.2"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "transform": {
+      "^.+\\.[jt]sx?$": "babel-jest"
+    },
+    "transformIgnorePatterns": []
   }
 }
