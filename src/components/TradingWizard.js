@@ -472,7 +472,7 @@ export default function TradingWizardContainer() {
       const metrics = calculateTradeMetrics({
         ...state,
         accountBalance:  parseFloat(state.accountBalance),
-        riskPercentage:  parseFloat(state.riskPercentage) || 1,
+        riskPercentage:  (() => { const v = parseFloat(state.riskPercentage); return isNaN(v) ? 1 : v; })(),
         entryPrice:      parseFloat(state.entryPrice),
         stopLossPrice:   parseFloat(state.stopLossPrice),
         takeProfitPrice: parseFloat(state.takeProfitPrice),

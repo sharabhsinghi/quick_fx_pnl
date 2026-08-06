@@ -49,11 +49,11 @@ export function calculateTradeMetrics(wizardData) {
     takeProfitPrice,
   } = wizardData;
 
-  const entry = Number(entryPrice);
-  const sl    = Number(stopLossPrice);
-  const tp    = Number(takeProfitPrice);
-  const bal   = Number(accountBalance);
-  const riskPct = Number(riskPercentage);
+  const entry = entryPrice === '' || entryPrice == null ? NaN : Number(entryPrice);
+  const sl    = stopLossPrice === '' || stopLossPrice == null ? NaN : Number(stopLossPrice);
+  const tp    = takeProfitPrice === '' || takeProfitPrice == null ? NaN : Number(takeProfitPrice);
+  const bal   = accountBalance === '' || accountBalance == null ? NaN : Number(accountBalance);
+  const riskPct = riskPercentage === '' || riskPercentage == null ? NaN : Number(riskPercentage);
 
   // ── Validation ──────────────────────────────────────────────────────────────
   if (isNaN(entry) || isNaN(sl) || isNaN(tp) || isNaN(bal) || isNaN(riskPct)) {

@@ -202,12 +202,10 @@ describe('calculateTradeMetrics — verdict', () => {
     expect(result.verdict).toBe('REDUCED_POSITION_EXECUTE');
   });
 
-  test('NO_TRADE when keyLevel is None/Floating regardless of score', () => {
-    // Even if score >= 80, floating key must force NO_TRADE per spec
-    // Achieve score > 80: all indicators + floating still gives 70, below 80 anyway
-    // Let's test explicitly: score 70 with float → reduced (still no EXECUTE_TRADE)
+  test('REDUCED_POSITION_EXECUTE (not EXECUTE_TRADE) when keyLevel is None/Floating', () => {
+    // Floating key level reduces score to 70 which maps to REDUCED_POSITION_EXECUTE, never EXECUTE_TRADE
     const result = calculateTradeMetrics(baseData({ keyLevel: 'None/Floating' }));
-    expect(result.verdict).not.toBe('EXECUTE_TRADE');
+    expect(result.verdict).toBe('REDUCED_POSITION_EXECUTE');
   });
 
   test('NO_TRADE when RRR is invalid', () => {

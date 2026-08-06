@@ -31,6 +31,8 @@
     "transform": {
       "^.+\\.[jt]sx?$": "babel-jest"
     },
-    "transformIgnorePatterns": []
+    "transformIgnorePatterns": [
+      "/node_modules/"
+    ]
   }
 }
