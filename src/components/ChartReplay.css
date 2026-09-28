@@ -1,0 +1,39 @@
+/* ── Chart replay tool ── */
+/* Builds on the shared .orb-* primitives (ORB.css) for a consistent look with
+   the rest of the app's data tools; only the transport scrubber is bespoke. */
+
+.replay-scrubber {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  margin-top: 10px;
+  background: var(--bg-3);
+  border-radius: 2px;
+  outline: none;
+}
+.replay-scrubber::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--amber);
+  border: 2px solid var(--bg-1);
+  cursor: pointer;
+}
+.replay-scrubber::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--amber);
+  border: 2px solid var(--bg-1);
+  cursor: pointer;
+}
+.replay-scrubber:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.orb-toggle input[type="number"] {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
+  padding: 4px 7px; color: var(--text); font-family: var(--font-mono); font-size: 11px;
+}
+.orb-toggle input[type="number"]:focus { border-color: var(--amber); }
