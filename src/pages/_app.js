@@ -13,6 +13,7 @@ import '../components/Calculators.css';
 import '../components/PLCalculator.css';
 import '../components/ORB.css';
 import '../components/ChartReplay.css';
+import '../components/TradingWizard.css';
 
 export default function MyApp({ Component, pageProps }) {
   return (

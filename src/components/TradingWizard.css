@@ -1,0 +1,461 @@
+/* ── Trading Wizard ─────────────────────────────────────────────────────────── */
+
+.wiz-wrap { padding: 0 0 4rem; animation: fadeIn 0.25s ease; }
+
+/* Progress bar */
+.wiz-progress {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 1.25rem 1.5rem 0;
+  max-width: 860px;
+  margin: 0 auto;
+}
+.wiz-step-dot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  position: relative;
+}
+.wiz-step-dot::after {
+  content: '';
+  position: absolute;
+  top: 12px;
+  left: calc(50% + 14px);
+  right: calc(-50% + 14px);
+  height: 1px;
+  background: var(--border);
+  z-index: 0;
+}
+.wiz-step-dot:last-child::after { display: none; }
+.wiz-dot-circle {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  position: relative;
+  z-index: 1;
+  transition: all 0.2s;
+}
+.wiz-step-dot.done .wiz-dot-circle {
+  background: var(--amber);
+  border-color: var(--amber);
+  color: #000;
+}
+.wiz-step-dot.active .wiz-dot-circle {
+  border-color: var(--amber);
+  color: var(--amber);
+}
+.wiz-dot-label {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  text-align: center;
+  white-space: nowrap;
+}
+.wiz-step-dot.active .wiz-dot-label { color: var(--amber); }
+.wiz-step-dot.done .wiz-dot-label   { color: var(--text-muted); }
+
+/* Card */
+.wiz-card {
+  max-width: 860px;
+  margin: 1.25rem auto 0;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 2rem;
+  animation: fadeIn 0.2s ease;
+}
+
+.wiz-step-title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  color: var(--amber);
+  margin-bottom: 1.5rem;
+}
+
+/* Form fields */
+.wiz-field { margin-bottom: 1.25rem; }
+.wiz-label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.wiz-label-hint {
+  color: var(--text-dim);
+  margin-left: 6px;
+}
+.wiz-input, .wiz-select {
+  width: 100%;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 9px 12px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  transition: border-color 0.15s;
+}
+.wiz-input:focus, .wiz-select:focus {
+  border-color: var(--amber);
+}
+.wiz-select option { background: var(--bg-2); }
+
+/* Row of two inputs */
+.wiz-row2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.wiz-row3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+}
+
+/* Warning banner */
+.wiz-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  background: rgba(255, 179, 0, 0.08);
+  border: 1px solid rgba(255, 179, 0, 0.25);
+  border-radius: 4px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--amber);
+  margin-top: 8px;
+}
+
+/* Card grid selection (patterns / levels) */
+.wiz-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+.wiz-option-card {
+  padding: 12px 14px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.4;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+.wiz-option-card:hover {
+  border-color: var(--border-hover);
+  color: var(--text);
+}
+.wiz-option-card.selected {
+  border-color: var(--amber);
+  background: var(--amber-dim);
+  color: var(--amber);
+}
+.wiz-option-card .wiz-card-icon { font-size: 18px; margin-bottom: 6px; }
+.wiz-option-card .wiz-card-label { font-weight: 600; }
+.wiz-option-card .wiz-card-sub {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+.wiz-option-card.selected .wiz-card-sub { color: var(--amber); opacity: 0.7; }
+
+/* Checklist */
+.wiz-checklist { display: flex; flex-direction: column; gap: 8px; }
+.wiz-check-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.wiz-check-item.checked {
+  border-color: var(--amber);
+  background: var(--amber-dim);
+}
+.wiz-check-box {
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--bg-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 10px;
+  transition: all 0.15s;
+}
+.wiz-check-item.checked .wiz-check-box {
+  border-color: var(--amber);
+  background: var(--amber);
+  color: #000;
+}
+.wiz-check-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+}
+.wiz-check-item.checked .wiz-check-label { color: var(--amber); }
+.wiz-check-desc {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-left: auto;
+}
+
+/* Navigation */
+.wiz-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+.wiz-nav-left { display: flex; gap: 8px; align-items: center; }
+.wiz-btn-back {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  padding: 8px 16px;
+  border-radius: 4px;
+  transition: border-color 0.15s, color 0.15s;
+}
+.wiz-btn-back:hover { border-color: var(--border-hover); color: var(--text); }
+.wiz-btn-next {
+  background: var(--amber);
+  border: none;
+  color: #000;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  padding: 9px 20px;
+  border-radius: 4px;
+  font-weight: 600;
+  transition: opacity 0.15s;
+}
+.wiz-btn-next:hover { opacity: 0.88; }
+.wiz-btn-next:disabled { opacity: 0.35; cursor: not-allowed; }
+.wiz-step-counter {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+/* ── Confluence Summary (Step 7 result view) ──────────────────────────── */
+.wiz-summary-wrap { animation: fadeIn 0.3s ease; }
+
+.wiz-verdict-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 1.25rem 1.5rem;
+  border-radius: 6px;
+  margin-bottom: 1.5rem;
+  border: 1px solid;
+}
+.wiz-verdict-banner.execute {
+  background: rgba(0, 230, 118, 0.07);
+  border-color: rgba(0, 230, 118, 0.3);
+}
+.wiz-verdict-banner.reduced {
+  background: rgba(255, 179, 0, 0.07);
+  border-color: rgba(255, 179, 0, 0.3);
+}
+.wiz-verdict-banner.no-trade {
+  background: rgba(255, 68, 68, 0.07);
+  border-color: rgba(255, 68, 68, 0.3);
+}
+.wiz-verdict-icon { font-size: 28px; line-height: 1; }
+.wiz-verdict-text { flex: 1; }
+.wiz-verdict-title {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+.execute  .wiz-verdict-title { color: var(--green); }
+.reduced  .wiz-verdict-title { color: var(--amber); }
+.no-trade .wiz-verdict-title { color: var(--red); }
+.wiz-verdict-sub {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+
+/* Score gauge */
+.wiz-score-section {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+.wiz-score-circle {
+  position: relative;
+  width: 100px;
+  height: 100px;
+  flex-shrink: 0;
+}
+.wiz-score-svg { width: 100px; height: 100px; transform: rotate(-90deg); }
+.wiz-score-track { fill: none; stroke: var(--border); stroke-width: 6; }
+.wiz-score-fill  { fill: none; stroke-width: 6; stroke-linecap: round; transition: stroke-dashoffset 0.6s ease; }
+.wiz-score-fill.high   { stroke: var(--green); }
+.wiz-score-fill.medium { stroke: var(--amber); }
+.wiz-score-fill.low    { stroke: var(--red); }
+.wiz-score-number {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.wiz-score-val {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1;
+}
+.wiz-score-max {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-dim);
+}
+.wiz-score-breakdown { flex: 1; }
+.wiz-score-breakdown-title {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+}
+.wiz-score-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.wiz-score-row:last-child { border-bottom: none; }
+.wiz-score-pts { font-family: var(--font-mono); font-size: 11px; }
+.wiz-score-pts.positive { color: var(--green); }
+.wiz-score-pts.negative { color: var(--red); }
+.wiz-score-pts.neutral  { color: var(--text-dim); }
+
+/* Risk metrics grid */
+.wiz-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 1.5rem;
+}
+.wiz-metric-card {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 14px;
+}
+.wiz-metric-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+.wiz-metric-val {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+.wiz-metric-val.good { color: var(--green); }
+.wiz-metric-val.warn { color: var(--amber); }
+.wiz-metric-val.bad  { color: var(--red); }
+.wiz-metric-sub {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+/* Warnings list */
+.wiz-warnings {
+  margin-bottom: 1.5rem;
+}
+.wiz-warning-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 12px;
+  margin-bottom: 6px;
+  background: rgba(255, 179, 0, 0.06);
+  border: 1px solid rgba(255, 179, 0, 0.2);
+  border-radius: 4px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--amber);
+}
+
+/* Summary reset button */
+.wiz-restart-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  padding: 9px 18px;
+  border-radius: 4px;
+  transition: border-color 0.15s, color 0.15s;
+}
+.wiz-restart-btn:hover { border-color: var(--amber); color: var(--amber); }
+
+/* Error */
+.wiz-error {
+  color: var(--red);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  margin-top: 6px;
+}
+
+@media (max-width: 640px) {
+  .wiz-card { padding: 1.25rem; }
+  .wiz-row2, .wiz-row3 { grid-template-columns: 1fr; }
+  .wiz-metrics-grid { grid-template-columns: 1fr 1fr; }
+  .wiz-score-section { flex-direction: column; align-items: flex-start; }
+  .wiz-dot-label { display: none; }
+}
