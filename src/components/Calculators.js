@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import PipCalculator from './PipCalculator';
 import PLCalculator from './PLCalculator';
+import ChartReplay from './ChartReplay';
+import ORB from './ORB';
 
 export default function Calculators({ trades, onOpen, onOpenForm, accountCurrency, accountSize, usdRate }) {
-  const [active, setActive] = useState(null); // null | 'pip' | 'pl'
+  const [active, setActive] = useState(null); // null | 'pip' | 'pl' | 'replay' | 'orb'
 
   const handleOpenTrade = (data) => {
     onOpen(data);
@@ -42,6 +44,26 @@ export default function Calculators({ trades, onOpen, onOpenForm, accountCurrenc
               <div className="calcs-card-cta">OPEN CALCULATOR →</div>
             </button>
 
+            <button className="calcs-card" onClick={() => setActive('replay')}>
+              <div className="calcs-card-icon">▶</div>
+              <div className="calcs-card-name">CHART REPLAY</div>
+              <div className="calcs-card-desc">
+                Step candle-by-candle through cached history, TradingView-style. Choose a
+                timeframe from 5-min up to daily, and overlay volume, VWAP and multiple EMAs.
+              </div>
+              <div className="calcs-card-cta">OPEN CALCULATOR →</div>
+            </button>
+
+            <button className="calcs-card" onClick={() => setActive('orb')}>
+              <div className="calcs-card-icon">◈</div>
+              <div className="calcs-card-name">ORB SCREENER</div>
+              <div className="calcs-card-desc">
+                Opening-range-breakout screener, historical data cache, and backtester for a
+                configurable ticker universe. Screen live, backfill history, and replay sessions.
+              </div>
+              <div className="calcs-card-cta">OPEN CALCULATOR →</div>
+            </button>
+
           </div>
         </div>
       )}
@@ -65,6 +87,22 @@ export default function Calculators({ trades, onOpen, onOpenForm, accountCurrenc
             accountSize={accountSize}
             usdRate={usdRate}
           />
+        </div>
+      )}
+
+      {/* ── Chart Replay — inline ── */}
+      {active === 'replay' && (
+        <div className="calcs-pl-wrap">
+          <button className="calcs-back-btn" onClick={() => setActive(null)}>← BACK TO CALCULATORS</button>
+          <ChartReplay />
+        </div>
+      )}
+
+      {/* ── ORB Screener — inline ── */}
+      {active === 'orb' && (
+        <div className="calcs-pl-wrap">
+          <button className="calcs-back-btn" onClick={() => setActive(null)}>← BACK TO CALCULATORS</button>
+          <ORB />
         </div>
       )}
 
