@@ -1,0 +1,439 @@
+//@version=6
+// =============================================================================
+//  ORB Screener Strategy  —  TradingView port of the ORB backtester
+// =============================================================================
+//  Opening range breakout on the first 15 minutes of the regular session, with
+//  the RVOL / RSI / VWAP / gap / ATR-range filter stack, then a configurable
+//  stop, target and end-of-session close.
+//
+//  Run it on a 5-minute chart with EXTENDED HOURS OFF. Every knob is in the
+//  CONFIG section below (they appear in the indicator's Settings dialog too).
+//
+//  Four details deliberately do NOT use the obvious TradingView built-in,
+//  because the built-in would quietly disagree with the backtester:
+//
+//   1. RSI resets every session. `ta.rsi()` runs continuously across days; this
+//      script rebuilds Wilder's RSI from the current session's closes only, and
+//      returns na until 10 closes exist. That is why a 09:45 breakout shows no
+//      RSI value at all rather than a number carried over from yesterday.
+//   2. ATR uses a SIMPLE average of true range, not Wilder's. `ta.atr()` is
+//      RMA-smoothed and would give a different ORB/ATR ratio, so this uses
+//      ta.sma(ta.tr(true), n) on daily bars.
+//   3. RVOL compares a bar to the same TIME-OF-DAY slot on previous days, not
+//      to a rolling average of recent bars. 10:05 is measured against 10:05.
+//   4. Entry fills at the breakout candle's CLOSE, which needs
+//      process_orders_on_close=true. Without it TradingView fills at the next
+//      bar's open, which is the more realistic assumption — see ENTRY below.
+// =============================================================================
+
+strategy(
+     title                = "ORB Screener Strategy",
+     shorttitle           = "ORB",
+     overlay              = true,
+     initial_capital      = 10000,
+     default_qty_type     = strategy.fixed,
+     currency             = currency.USD,
+     pyramiding           = 0,
+     calc_on_every_tick   = false,
+     // TRUE  = fill at the signal candle's close (matches the backtester's
+     //         default; slightly optimistic, you cannot trade a printed close)
+     // FALSE = fill at the next candle's open (the honest version)
+     process_orders_on_close = true,
+     commission_type      = strategy.commission.cash_per_order,
+     commission_value     = 1.0,
+     slippage             = 0)
+
+// =============================================================================
+//  CONFIG
+// =============================================================================
+
+// ---- Opening range -----------------------------------------------------------
+gRange       = "1 · Opening range"
+sessionStr   = input.session("0930-1600", "Regular session",        group = gRange)
+sessionTz    = input.string ("America/New_York", "Session timezone", group = gRange)
+orbMinutes   = input.int    (15,  "Opening range (minutes)", minval = 5, step = 5, group = gRange)
+allowLongs   = input.bool   (true,  "Trade breakouts up (long)",   group = gRange)
+allowShorts  = input.bool   (true,  "Trade breakouts down (short)", group = gRange)
+singleShot   = input.bool   (false, "Single-shot signal", group = gRange,
+     tooltip = "OFF (default): keep scanning forward and take the first candle that clears every filter.\nON: the first candle closing outside the range IS the signal — if it fails a filter, no trade that day.")
+
+// ---- Filters -----------------------------------------------------------------
+gFilt        = "2 · Filters"
+useClean     = input.bool (true, "Clean breakout (open AND close outside)", group = gFilt)
+useRvol      = input.bool (true, "RVOL", group = gFilt)
+rvolThresh   = input.float(1.5,  "    RVOL threshold (x)", minval = 0.0, step = 0.1, group = gFilt)
+rvolLookback = input.int  (10,   "    RVOL lookback (days)", minval = 1, maxval = 20, group = gFilt)
+useRsi       = input.bool (true, "RSI", group = gFilt)
+rsiPeriod    = input.int  (9,    "    RSI period", minval = 2, group = gFilt)
+rsiOB        = input.float(70,   "    Block longs at RSI >=", group = gFilt)
+rsiOS        = input.float(30,   "    Block shorts at RSI <=", group = gFilt)
+useVwap      = input.bool (true, "VWAP must confirm direction", group = gFilt)
+useGap       = input.bool (true, "Gap %", group = gFilt)
+gapMin       = input.float(1.0,  "    Gap min (%)", step = 0.1, group = gFilt)
+gapMax       = input.float(5.0,  "    Gap max (%)", step = 0.1, group = gFilt)
+useAtrRange  = input.bool (true, "ORB range vs ATR", group = gFilt)
+atrPeriod    = input.int  (14,   "    ATR period (daily)", minval = 2, group = gFilt)
+atrMin       = input.float(0.15, "    ORB/ATR min (x)", step = 0.05, group = gFilt)
+atrMax       = input.float(0.75, "    ORB/ATR max (x)", step = 0.05, group = gFilt)
+
+// ---- Stop ---------------------------------------------------------------------
+gStop        = "3 · Stop loss"
+stopBasis    = input.string("Opposite side of the ORB range", "Initial stop basis",
+     options = ["Opposite side of the ORB range", "Percent of entry price", "Dollars per share", "Multiple of ORB distance"],
+     group = gStop)
+stopValue    = input.float (0.75, "Initial stop value", step = 0.05, group = gStop,
+     tooltip = "Percent of entry price, dollars per share, or a multiple of the ORB distance — depending on the basis above. Ignored for 'Opposite side of the ORB range'.")
+stopType     = input.string("Giveback (trail the profit)", "Stop behaviour",
+     options = ["Strict (fixed)", "Trailing (follow the price)", "Giveback (trail the profit)"],
+     group = gStop,
+     tooltip = "Trailing follows the PRICE by the stop distance — a wide percentage (20%) is never reached intraday, so trades run to the bell.\nGiveback follows the PROFIT: it exits once the trade hands back a share of its best gain.")
+givebackPct  = input.float (20.0, "Giveback (% of peak profit)", minval = 0.0, maxval = 100.0, step = 1, group = gStop,
+     tooltip = "Exit after returning this much of the best gain. 20 keeps 80% of the peak.")
+givebackArm  = input.float (0.5,  "Arm giveback after (% in profit)", minval = 0.0, step = 0.1, group = gStop,
+     tooltip = "The giveback trail stays off until the trade is this far in front. At 0 the first tick of profit drags the stop to breakeven and noise stops you out.")
+
+// ---- Target & exits ------------------------------------------------------------
+gTgt         = "4 · Target & exits"
+tpEnabled    = input.bool  (false, "Use a take profit", group = gTgt)
+tpBasis      = input.string("R multiple", "Target basis",
+     options = ["R multiple", "Percent of entry price", "Dollars per share"], group = gTgt)
+tpValue      = input.float (2.0, "Target value", step = 0.1, group = gTgt)
+closeAtEnd   = input.bool  (true, "Force close at session end (no overnight holds)", group = gTgt)
+
+// ---- Sizing --------------------------------------------------------------------
+gSize        = "5 · Position sizing"
+sizeMode     = input.string("Risk % of equity", "Sizing",
+     options = ["Risk % of equity", "Fixed notional ($)", "Fixed shares"], group = gSize)
+riskPct      = input.float (1.0,   "Risk per trade (% of equity)", minval = 0.01, step = 0.1, group = gSize)
+fixedNotional= input.float (10000, "Fixed notional ($)", group = gSize)
+fixedShares  = input.int   (100,   "Fixed shares", group = gSize)
+maxPosPct    = input.float (100,   "Max position (% of equity)", group = gSize)
+
+// ---- Display -------------------------------------------------------------------
+gShow        = "6 · Display"
+showOrb      = input.bool(true, "Draw the opening range", group = gShow)
+showVwap     = input.bool(true, "Draw session VWAP",      group = gShow)
+showStop     = input.bool(true, "Draw the live stop",     group = gShow)
+showTable    = input.bool(true, "Show the filter panel",  group = gShow)
+
+// =============================================================================
+//  SESSION SCAFFOLDING
+// =============================================================================
+
+tfMin       = math.max(1, int(timeframe.in_seconds(timeframe.period) / 60))
+inSession   = not na(time(timeframe.period, sessionStr, sessionTz))
+newSession  = inSession and not inSession[1]
+orbBars     = math.max(1, int(math.round(1.0 * orbMinutes / tfMin)))
+
+etMins      = hour(time, sessionTz) * 60 + minute(time, sessionTz)
+sessEndMins = 16 * 60
+isLastBar   = inSession and (etMins + tfMin >= sessEndMins)
+
+var int barIdx = -1
+if newSession
+    barIdx := 0
+else if inSession
+    barIdx := barIdx + 1
+
+inOrb    = inSession and barIdx < orbBars
+afterOrb = inSession and barIdx >= orbBars
+
+// ---- opening range -------------------------------------------------------------
+var float orbHigh   = na
+var float orbLow    = na
+var float sessOpen  = na
+var float orbVolSum = 0.0
+
+if newSession
+    orbHigh   := high
+    orbLow    := low
+    sessOpen  := open
+    orbVolSum := volume
+else if inOrb
+    orbHigh   := math.max(orbHigh, high)
+    orbLow    := math.min(orbLow, low)
+    orbVolSum := orbVolSum + volume
+
+orbRange = orbHigh - orbLow
+
+// =============================================================================
+//  INDICATORS
+// =============================================================================
+
+// ---- session VWAP: cumulative hlc3 x volume, reset each day ---------------------
+var float cumPV = 0.0
+var float cumV  = 0.0
+if newSession
+    cumPV := hlc3 * volume
+    cumV  := volume
+else if inSession
+    cumPV := cumPV + hlc3 * volume
+    cumV  := cumV + volume
+vwapVal = cumV > 0 ? cumPV / cumV : na
+
+// ---- session RSI: Wilder, rebuilt from this session's closes only ---------------
+// Seeded with a simple average of the first `rsiPeriod` changes, then smoothed —
+// identical to the backtester, and na until rsiPeriod + 1 closes exist.
+var int   rsiN    = 0
+var float rsiSumG = 0.0
+var float rsiSumL = 0.0
+var float avgGain = na
+var float avgLoss = na
+var float sessRsi = na
+
+if newSession
+    rsiN    := 1
+    rsiSumG := 0.0
+    rsiSumL := 0.0
+    avgGain := na
+    avgLoss := na
+    sessRsi := na
+else if inSession
+    ch = close - close[1]
+    g  = ch > 0 ? ch : 0.0
+    l  = ch < 0 ? -ch : 0.0
+    rsiN := rsiN + 1
+    if rsiN <= rsiPeriod + 1
+        rsiSumG := rsiSumG + g
+        rsiSumL := rsiSumL + l
+        if rsiN == rsiPeriod + 1
+            avgGain := rsiSumG / rsiPeriod
+            avgLoss := rsiSumL / rsiPeriod
+    else
+        avgGain := (avgGain * (rsiPeriod - 1) + g) / rsiPeriod
+        avgLoss := (avgLoss * (rsiPeriod - 1) + l) / rsiPeriod
+    sessRsi := na(avgGain) ? na : (avgLoss == 0 ? 100.0 : 100.0 - 100.0 / (1.0 + avgGain / avgLoss))
+
+// ---- daily context: prior close for the gap, simple-average ATR for the range ----
+// close[1] / [1] inside request.security means only confirmed prior-day values are
+// used, so nothing here repaints.
+prevDayClose = request.security(syminfo.tickerid, "D", close[1], lookahead = barmerge.lookahead_on)
+dailyAtr     = request.security(syminfo.tickerid, "D", ta.sma(ta.tr(true), atrPeriod)[1], lookahead = barmerge.lookahead_on)
+
+gapPct    = not na(prevDayClose) and prevDayClose > 0 ? (sessOpen - prevDayClose) / prevDayClose * 100.0 : na
+gapAbs    = na(gapPct) ? na : math.abs(gapPct)
+rangeAtr  = not na(dailyAtr) and dailyAtr > 0 ? orbRange / dailyAtr : na
+
+// ---- RVOL against the same time-of-day slot on previous sessions ----------------
+MAX_SLOTS = 120
+MAX_LB    = 20
+var matrix<float> slotBuf = matrix.new<float>(MAX_SLOTS, MAX_LB, na)
+var array<int>    slotCnt = array.new_int(MAX_SLOTS, 0)
+
+float slotAvg = na
+if inSession and barIdx >= 0 and barIdx < MAX_SLOTS
+    cnt = array.get(slotCnt, barIdx)
+    n   = math.min(cnt, rvolLookback)
+    if n > 0
+        float s = 0.0
+        for i = 1 to n
+            s := s + matrix.get(slotBuf, barIdx, (cnt - i) % MAX_LB)
+        slotAvg := s / n
+
+// Same-day proxy when no prior-day history exists yet — a much weaker signal,
+// flagged in the panel so it is never mistaken for a real multi-day RVOL.
+fallbackAvg = orbVolSum / orbBars
+rvolIsProxy = na(slotAvg) or slotAvg <= 0
+rvolVal     = rvolIsProxy ? (fallbackAvg > 0 ? volume / fallbackAvg : 0.0) : volume / slotAvg
+
+// Today's volume is written AFTER the read above, so a bar is never part of its
+// own baseline.
+if inSession and barIdx >= 0 and barIdx < MAX_SLOTS
+    c = array.get(slotCnt, barIdx)
+    matrix.set(slotBuf, barIdx, c % MAX_LB, volume)
+    array.set(slotCnt, barIdx, c + 1)
+
+// =============================================================================
+//  SIGNAL
+// =============================================================================
+
+var bool signalDone  = false
+var bool tradedToday = false
+if newSession
+    signalDone  := false
+    tradedToday := false
+
+closedAbove = afterOrb and close > orbHigh
+closedBelow = afterOrb and close < orbLow
+isLongBreak = closedAbove and allowLongs
+isShortBreak= closedBelow and allowShorts
+anyBreak    = isLongBreak or isShortBreak
+
+bodyClean = isLongBreak ? open >= orbHigh : isShortBreak ? open <= orbLow : false
+
+// A na filter value is treated as "could not be computed" and does NOT block —
+// the same asymmetry the backtester uses. Clean-breakout and RVOL must be
+// strictly true; the rest only have to not be false.
+okClean = not useClean   or bodyClean
+okRvol  = not useRvol    or rvolVal >= rvolThresh
+okRsi   = not useRsi     or na(sessRsi) or (isLongBreak ? sessRsi < rsiOB : sessRsi > rsiOS)
+okVwap  = not useVwap    or na(vwapVal) or (isLongBreak ? close > vwapVal : close < vwapVal)
+okGap   = not useGap     or na(gapAbs)  or (gapAbs >= gapMin and gapAbs <= gapMax)
+okAtr   = not useAtrRange or na(rangeAtr) or (rangeAtr >= atrMin and rangeAtr <= atrMax)
+
+allOk   = okClean and okRvol and okRsi and okVwap and okGap and okAtr
+flat    = strategy.position_size == 0
+
+takeLong  = anyBreak and isLongBreak  and allOk and not signalDone and not tradedToday and flat
+takeShort = anyBreak and isShortBreak and allOk and not signalDone and not tradedToday and flat
+
+// In single-shot mode the first close outside the range consumes the day's
+// signal whether or not it passed.
+if anyBreak and singleShot
+    signalDone := true
+
+// =============================================================================
+//  SIZING
+// =============================================================================
+
+stopDistance(entryPx) =>
+    float orbDist = isLongBreak ? entryPx - orbLow : orbHigh - entryPx
+    float d = switch stopBasis
+        "Percent of entry price"      => entryPx * stopValue / 100.0
+        "Dollars per share"           => stopValue
+        "Multiple of ORB distance"    => stopValue * orbDist
+        => orbDist
+    d > 0 ? d : (orbDist > 0 ? orbDist : entryPx * 0.01)
+
+positionSize(entryPx, stopDist) =>
+    float q = switch sizeMode
+        "Fixed shares"      => fixedShares * 1.0
+        "Fixed notional ($)"=> fixedNotional / entryPx
+        => (strategy.equity * riskPct / 100.0) / stopDist
+    float capNotional = strategy.equity * maxPosPct / 100.0
+    if q * entryPx > capNotional
+        q := capNotional / entryPx
+    math.floor(q)
+
+// =============================================================================
+//  ENTRY
+// =============================================================================
+
+var float entryPx    = na
+var float initStop   = na
+var float curStop    = na
+var float tpLevel    = na
+var float extremePx  = na
+
+if (takeLong or takeShort)
+    px    = close
+    sDist = stopDistance(px)
+    qty   = positionSize(px, sDist)
+    if qty > 0
+        entryPx   := px
+        initStop  := takeLong ? px - sDist : px + sDist
+        curStop   := initStop
+        extremePx := px
+        rUnit     = math.abs(px - initStop)
+        tDist     = switch tpBasis
+            "Percent of entry price" => px * tpValue / 100.0
+            "Dollars per share"      => tpValue
+            => tpValue * rUnit
+        tpLevel   := tpEnabled ? (takeLong ? px + tDist : px - tDist) : na
+        tradedToday := true
+        signalDone  := true
+        if takeLong
+            strategy.entry("L", strategy.long, qty = qty)
+            strategy.exit("X", from_entry = "L", stop = initStop, limit = tpLevel,
+                 comment_loss = "stop", comment_profit = "target")
+        else
+            strategy.entry("S", strategy.short, qty = qty)
+            strategy.exit("X", from_entry = "S", stop = initStop, limit = tpLevel,
+                 comment_loss = "stop", comment_profit = "target")
+
+// =============================================================================
+//  EXIT MANAGEMENT
+// =============================================================================
+// The stop is recomputed from bars that have already closed and then submitted,
+// so the broker emulator tests it against the FOLLOWING bar — the same ordering
+// the backtester uses. A trailing stop never loosens.
+
+isLong  = strategy.position_size > 0
+isShort = strategy.position_size < 0
+
+if (isLong or isShort) and not na(entryPx)
+    extremePx := isLong ? math.max(extremePx, high) : math.min(extremePx, low)
+
+    if stopType == "Trailing (follow the price)"
+        float cand = na
+        if stopBasis == "Percent of entry price"
+            cand := isLong ? extremePx * (1 - stopValue / 100.0) : extremePx * (1 + stopValue / 100.0)
+        else
+            d = math.abs(entryPx - initStop)
+            cand := isLong ? extremePx - d : extremePx + d
+        curStop := isLong ? math.max(curStop, cand) : math.min(curStop, cand)
+
+    else if stopType == "Giveback (trail the profit)"
+        peakProfit = isLong ? extremePx - entryPx : entryPx - extremePx
+        armAt      = entryPx * givebackArm / 100.0
+        if peakProfit > 0 and peakProfit >= armAt
+            keep = 1.0 - givebackPct / 100.0
+            cand = isLong ? entryPx + peakProfit * keep : entryPx - peakProfit * keep
+            curStop := isLong ? math.max(curStop, cand) : math.min(curStop, cand)
+
+    strategy.exit("X", from_entry = isLong ? "L" : "S", stop = curStop, limit = tpLevel,
+         comment_loss = "stop", comment_profit = "target")
+
+// Intraday only — flatten on the session's last bar.
+if closeAtEnd and isLastBar and strategy.position_size != 0
+    strategy.close_all(comment = "session close")
+
+if not inSession and strategy.position_size == 0
+    entryPx   := na
+    curStop   := na
+    tpLevel   := na
+    extremePx := na
+
+// =============================================================================
+//  PLOTS
+// =============================================================================
+
+plotOrbHi = showOrb and afterOrb ? orbHigh : na
+plotOrbLo = showOrb and afterOrb ? orbLow  : na
+p1 = plot(plotOrbHi, "ORB high", color = color.new(color.blue, 0), style = plot.style_linebr, linewidth = 1)
+p2 = plot(plotOrbLo, "ORB low",  color = color.new(color.blue, 0), style = plot.style_linebr, linewidth = 1)
+fill(p1, p2, color = color.new(color.blue, 92), title = "Opening range")
+
+plot(showVwap and inSession ? vwapVal : na, "Session VWAP", color = color.new(color.orange, 0), style = plot.style_linebr)
+plot(showStop and strategy.position_size != 0 ? curStop : na, "Live stop", color = color.new(color.red, 0), style = plot.style_linebr, linewidth = 1)
+plot(showStop and strategy.position_size != 0 and tpEnabled ? tpLevel : na, "Target", color = color.new(color.green, 0), style = plot.style_linebr, linewidth = 1)
+
+plotshape(takeLong,  "Long signal",  shape.triangleup,   location.belowbar, color.new(color.green, 0), size = size.tiny)
+plotshape(takeShort, "Short signal", shape.triangledown, location.abovebar, color.new(color.red, 0),   size = size.tiny)
+// A breakout that was rejected by the filters — useful for seeing what you skipped.
+plotshape(anyBreak and not allOk and not tradedToday, "Rejected breakout", shape.xcross, location.top, color.new(color.gray, 40), size = size.tiny)
+
+// =============================================================================
+//  FILTER PANEL
+// =============================================================================
+
+mark(used, ok) => not used ? "–" : ok ? "✓" : "✗"
+f2(v) => na(v) ? "—" : str.tostring(v, "#.##")
+
+var table t = table.new(position.top_right, 2, 9, border_width = 1)
+if showTable and barstate.islast
+    table.cell(t, 0, 0, "ORB",       text_color = color.gray,  text_size = size.tiny)
+    table.cell(t, 1, 0, f2(orbLow) + "–" + f2(orbHigh), text_color = color.white, text_size = size.tiny)
+    table.cell(t, 0, 1, "Range/ATR", text_color = color.gray,  text_size = size.tiny)
+    table.cell(t, 1, 1, f2(rangeAtr) + "x " + mark(useAtrRange, okAtr), text_size = size.tiny,
+         text_color = na(rangeAtr) ? color.gray : okAtr ? color.green : color.red)
+    table.cell(t, 0, 2, "Gap %",     text_color = color.gray,  text_size = size.tiny)
+    table.cell(t, 1, 2, f2(gapPct) + "% " + mark(useGap, okGap), text_size = size.tiny,
+         text_color = na(gapPct) ? color.gray : okGap ? color.green : color.red)
+    table.cell(t, 0, 3, "RVOL",      text_color = color.gray,  text_size = size.tiny)
+    table.cell(t, 1, 3, f2(rvolVal) + "x" + (rvolIsProxy ? " (proxy)" : "") + " " + mark(useRvol, okRvol),
+         text_size = size.tiny, text_color = okRvol ? color.green : color.red)
+    table.cell(t, 0, 4, "RSI",       text_color = color.gray,  text_size = size.tiny)
+    table.cell(t, 1, 4, f2(sessRsi) + " " + mark(useRsi, okRsi), text_size = size.tiny,
+         text_color = na(sessRsi) ? color.gray : okRsi ? color.green : color.red)
+    table.cell(t, 0, 5, "VWAP",      text_color = color.gray,  text_size = size.tiny)
+    table.cell(t, 1, 5, f2(vwapVal) + " " + mark(useVwap, okVwap), text_size = size.tiny,
+         text_color = na(vwapVal) ? color.gray : okVwap ? color.green : color.red)
+    table.cell(t, 0, 6, "Clean",     text_color = color.gray,  text_size = size.tiny)
+    table.cell(t, 1, 6, mark(useClean, okClean), text_size = size.tiny,
+         text_color = okClean ? color.green : color.red)
+    table.cell(t, 0, 7, "Stop",      text_color = color.gray,  text_size = size.tiny)
+    table.cell(t, 1, 7, f2(curStop), text_color = color.white, text_size = size.tiny)
+    table.cell(t, 0, 8, "Baseline",  text_color = color.gray,  text_size = size.tiny)
+    table.cell(t, 1, 8, rvolIsProxy ? "same-day proxy" : str.tostring(math.min(array.get(slotCnt, math.max(0, math.min(barIdx, MAX_SLOTS - 1))), rvolLookback)) + "d",
+         text_color = color.white, text_size = size.tiny)
