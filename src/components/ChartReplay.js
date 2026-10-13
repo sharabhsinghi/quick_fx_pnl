@@ -1,4 +1,7 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, {
+  useState, useEffect, useMemo, useRef, useCallback, forwardRef, useImperativeHandle,
+} from 'react';
+import { createChart, CandlestickSeries, HistogramSeries, LineSeries, ColorType } from 'lightweight-charts';
 import {
   getStoredTickers, getIntradayByDay, getDailyBars,
   getIntraday1mByDay, deleteTicker1mData,
@@ -16,11 +19,6 @@ import { minsToHHMM, getSessionDate, shiftIsoDate } from '../orb/time';
 import { fmtNum } from '../orb/format';
 import { getApiKey } from '../lib/idb';
 
-const PAD = { top: 14, right: 64, bottom: 22, left: 8 };
-const PRICE_H = 360;
-const VOL_H = 80;
-
-const VIEWPORTS = [60, 120, 240, 400];
 const SPEEDS = [
   { ms: 1500, label: 'SLOW' },
   { ms: 750, label: 'NORMAL' },
@@ -28,165 +26,195 @@ const SPEEDS = [
   { ms: 120, label: 'FASTEST' },
 ];
 const EMA_PRESETS = [9, 21, 50, 100, 200];
-
-function candleLabel(c, isDaily) {
-  return isDaily ? c.d : `${c.d.slice(5)} ${minsToHHMM(c.m)}`;
-}
+const toSec = (ms) => Math.floor(ms / 1000);
 
 /**
- * Hand-drawn SVG candlestick chart — same approach as the ORB session chart
- * (candles plus overlays are simpler drawn directly than wired through a
- * charting library), generalised here for an arbitrary sliding window of
- * candles rather than one fixed session.
+ * Candlestick chart via TradingView's lightweight-charts — native drag-to-pan
+ * and scroll-to-zoom on the time axis, rather than the hand-rolled SVG +
+ * custom viewport/pan math this replaced. The chart instance and its series
+ * are created once and updated in place, so panning/zooming state survives
+ * every replay step (setData keeps the user's current view unless it no
+ * longer fits the data).
  */
-function ReplayChart({
-  candles, emaLines, vwap, showVolume, width, isDaily, colorFor,
-}) {
-  const [hover, setHover] = useState(null);
-  const svgRef = useRef(null);
+const ReplayChart = forwardRef(function ReplayChart(
+  { candles, emaLines, vwap, showVolume, width, isDaily, colorFor }, ref,
+) {
+  const containerRef = useRef(null);
+  const chartRef = useRef(null);
+  const seriesRef = useRef({ candle: null, volume: null, vwap: null, ema: new Map(), colors: {} });
+  const lookupRef = useRef(new Map()); // time (sec) -> { bar, vwapVal, emaVals }
+  const isDailyRef = useRef(isDaily);
+  const [legend, setLegend] = useState(null);
 
-  const n = candles.length;
-  const plotW = Math.max(120, width - PAD.left - PAD.right);
-  const step = plotW / Math.max(1, n);
-  const candleW = Math.max(1.5, Math.min(11, step * 0.62));
-  const volTop = PAD.top + PRICE_H + 16;
-  const totalH = showVolume ? volTop + VOL_H + PAD.bottom : PAD.top + PRICE_H + PAD.bottom;
+  useImperativeHandle(ref, () => ({
+    scrollToNow() { chartRef.current && chartRef.current.timeScale().scrollToRealTime(); },
+  }), []);
 
-  const domain = useMemo(() => {
-    let lo = Infinity, hi = -Infinity;
-    candles.forEach((b) => { if (b.l < lo) lo = b.l; if (b.h > hi) hi = b.h; });
-    [vwap, ...emaLines.map(e => e.values)].forEach((series) => {
-      (series || []).forEach((v) => {
-        if (v === null || v === undefined) return;
-        if (v < lo) lo = v; if (v > hi) hi = v;
+  // Created once. Colors are read from the live theme at creation time.
+  // shortcut: won't recolor if the user flips light/dark while this is open — reopen the tool to pick up the new theme.
+  useEffect(() => {
+    const css = getComputedStyle(document.documentElement);
+    const col = (name) => css.getPropertyValue(name).trim();
+    seriesRef.current.colors = { green: col('--green'), red: col('--red'), amber: col('--amber') };
+
+    const chart = createChart(containerRef.current, {
+      width,
+      height: 420,
+      layout: { background: { type: ColorType.Solid, color: 'transparent' }, textColor: col('--text-muted') },
+      grid: { vertLines: { color: col('--border') }, horzLines: { color: col('--border') } },
+      rightPriceScale: { borderColor: col('--border') },
+      timeScale: {
+        borderColor: col('--border'),
+        timeVisible: true,
+        tickMarkFormatter: (time) => {
+          const e = lookupRef.current.get(time);
+          if (!e) return '';
+          return isDailyRef.current ? e.bar.d : minsToHHMM(e.bar.m);
+        },
+      },
+      localization: {
+        timeFormatter: (time) => {
+          const e = lookupRef.current.get(time);
+          if (!e) return '';
+          return isDailyRef.current ? e.bar.d : `${e.bar.d} ${minsToHHMM(e.bar.m)} ET`;
+        },
+      },
+    });
+    chartRef.current = chart;
+    seriesRef.current.candle = chart.addSeries(CandlestickSeries, {
+      upColor: col('--green'), downColor: col('--red'),
+      borderUpColor: col('--green'), borderDownColor: col('--red'),
+      wickUpColor: col('--green'), wickDownColor: col('--red'),
+    });
+    chart.subscribeCrosshairMove((param) => {
+      setLegend((param && param.time && lookupRef.current.get(param.time)) || null);
+    });
+
+    return () => {
+      chart.remove();
+      chartRef.current = null;
+      seriesRef.current = { candle: null, volume: null, vwap: null, ema: new Map(), colors: seriesRef.current.colors };
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => { isDailyRef.current = isDaily; }, [isDaily]);
+  useEffect(() => { chartRef.current && chartRef.current.applyOptions({ width }); }, [width]);
+
+  // Add/remove the volume histogram to match the toggle.
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    if (showVolume && !seriesRef.current.volume) {
+      const vol = chart.addSeries(HistogramSeries, { priceFormat: { type: 'volume' }, priceScaleId: 'vol' });
+      vol.priceScale().applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
+      seriesRef.current.volume = vol;
+    } else if (!showVolume && seriesRef.current.volume) {
+      chart.removeSeries(seriesRef.current.volume);
+      seriesRef.current.volume = null;
+    }
+  }, [showVolume]);
+
+  // Add/remove the VWAP line to match the toggle.
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    if (vwap && !seriesRef.current.vwap) {
+      seriesRef.current.vwap = chart.addSeries(LineSeries, {
+        color: seriesRef.current.colors.amber, lineWidth: 1, priceLineVisible: false, lastValueVisible: false,
+      });
+    } else if (!vwap && seriesRef.current.vwap) {
+      chart.removeSeries(seriesRef.current.vwap);
+      seriesRef.current.vwap = null;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!vwap]);
+
+  // Add/remove EMA lines to match the current period list.
+  const emaKey = emaLines.map(e => e.period).join(',');
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    const want = new Set(emaLines.map(e => e.period));
+    for (const [period, s] of seriesRef.current.ema) {
+      if (!want.has(period)) { chart.removeSeries(s); seriesRef.current.ema.delete(period); }
+    }
+    emaLines.forEach(({ period }) => {
+      if (!seriesRef.current.ema.has(period)) {
+        seriesRef.current.ema.set(period, chart.addSeries(LineSeries, {
+          color: colorFor(period), lineWidth: 1, priceLineVisible: false, lastValueVisible: false,
+        }));
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [emaKey]);
+
+  // Push data into whichever series currently exist.
+  useEffect(() => {
+    if (!seriesRef.current.candle) return;
+    const lookup = new Map();
+    candles.forEach((b, i) => {
+      lookup.set(toSec(b.t), {
+        bar: b,
+        vwapVal: vwap ? vwap[i] : null,
+        emaVals: emaLines.map(e => ({ period: e.period, value: e.values[i] })),
       });
     });
-    if (!isFinite(lo) || !isFinite(hi)) { lo = 0; hi = 1; }
-    const pad = (hi - lo) * 0.06 || 1;
-    return { lo: lo - pad, hi: hi + pad };
-  }, [candles, vwap, emaLines]);
+    lookupRef.current = lookup;
 
-  const maxVol = useMemo(() => Math.max(1, ...candles.map(b => b.v)), [candles]);
+    seriesRef.current.candle.setData(
+      candles.map(b => ({ time: toSec(b.t), open: b.o, high: b.h, low: b.l, close: b.c })));
 
-  const x = i => PAD.left + i * step + step / 2;
-  const y = p => PAD.top + (1 - (p - domain.lo) / (domain.hi - domain.lo)) * PRICE_H;
-  const vy = v => volTop + (1 - v / maxVol) * VOL_H;
+    if (seriesRef.current.volume) {
+      const { green, red } = seriesRef.current.colors;
+      seriesRef.current.volume.setData(candles.map(b => ({
+        time: toSec(b.t), value: b.v, color: (b.c >= b.o ? green : red) + '66',
+      })));
+    }
+    if (seriesRef.current.vwap && vwap) {
+      seriesRef.current.vwap.setData(
+        candles.map((b, i) => (vwap[i] == null ? null : { time: toSec(b.t), value: vwap[i] })).filter(Boolean));
+    }
+    emaLines.forEach(({ period, values }) => {
+      const s = seriesRef.current.ema.get(period);
+      if (!s) return;
+      s.setData(
+        candles.map((b, i) => (values[i] == null ? null : { time: toSec(b.t), value: values[i] })).filter(Boolean));
+    });
+  }, [candles, emaLines, vwap, showVolume, emaKey]);
 
-  const onMove = useCallback((e) => {
-    const rect = svgRef.current.getBoundingClientRect();
-    const i = Math.floor((e.clientX - rect.left - PAD.left) / step);
-    setHover(i >= 0 && i < n ? i : null);
-  }, [step, n]);
+  const last = candles[candles.length - 1];
+  const fallback = last ? {
+    bar: last,
+    vwapVal: vwap ? vwap[vwap.length - 1] : null,
+    emaVals: emaLines.map(e => ({ period: e.period, value: e.values[e.values.length - 1] })),
+  } : null;
+  const L = legend || fallback;
 
-  const ticks = useMemo(() => {
-    const span = domain.hi - domain.lo;
-    const raw = span / 5;
-    const mag = Math.pow(10, Math.floor(Math.log10(raw || 1)));
-    const stepSize = [1, 2, 2.5, 5, 10].map(m => m * mag).find(v => v >= raw) || mag * 10;
-    const out = [];
-    for (let v = Math.ceil(domain.lo / stepSize) * stepSize; v <= domain.hi; v += stepSize) out.push(v);
-    return out;
-  }, [domain]);
-
-  const tickStride = Math.max(1, Math.ceil(n / 9));
-  const shown = hover !== null ? candles[hover] : candles[n - 1];
-  const shownIdx = hover !== null ? hover : n - 1;
-
-  if (n === 0) return <div className="orb-empty">Nothing revealed yet — step forward or press play.</div>;
-
+  // The container div below must always render (never behind this
+  // conditional) — the chart is created against it exactly once on mount,
+  // and an early return here would leave that ref null forever.
   return (
-    <div style={{ position: 'relative' }}>
-      <svg ref={svgRef} width={width} height={totalH}
-        onMouseMove={onMove} onMouseLeave={() => setHover(null)}
-        style={{ display: 'block', cursor: 'crosshair' }}>
-
-        {ticks.map(v => (
-          <g key={v}>
-            <line x1={PAD.left} x2={PAD.left + plotW} y1={y(v)} y2={y(v)}
-              stroke="var(--border)" strokeWidth="1" />
-            <text x={PAD.left + plotW + 6} y={y(v) + 3.5}
-              fill="var(--text-dim)" fontSize="9" fontFamily="var(--font-mono)">
-              {fmtNum(v, 2)}
-            </text>
-          </g>
-        ))}
-
-        {showVolume && candles.map((b, i) => {
-          const up = b.c >= b.o;
-          return (
-            <rect key={'v' + i} x={x(i) - candleW / 2} y={vy(b.v)}
-              width={candleW} height={volTop + VOL_H - vy(b.v)}
-              fill={up ? 'var(--green)' : 'var(--red)'} opacity="0.4" />
-          );
-        })}
-
-        {vwap && (
-          <polyline
-            points={vwap.map((v, i) => (v === null ? null : `${x(i)},${y(v)}`))
-              .filter(Boolean).join(' ')}
-            fill="none" stroke="var(--amber)" strokeWidth="1.25" opacity="0.9" />
-        )}
-
-        {emaLines.map(e => (
-          <polyline key={e.period}
-            points={e.values.map((v, i) => (v === null ? null : `${x(i)},${y(v)}`))
-              .filter(Boolean).join(' ')}
-            fill="none" stroke={colorFor(e.period)} strokeWidth="1.4" opacity="0.9" />
-        ))}
-
-        {candles.map((b, i) => {
-          const up = b.c >= b.o;
-          const col = up ? 'var(--green)' : 'var(--red)';
-          const yO = y(b.o), yC = y(b.c);
-          return (
-            <g key={i} opacity={hover === null || hover === i ? 1 : 0.75}>
-              <line x1={x(i)} x2={x(i)} y1={y(b.h)} y2={y(b.l)} stroke={col} strokeWidth="1" />
-              <rect x={x(i) - candleW / 2} y={Math.min(yO, yC)}
-                width={candleW} height={Math.max(1, Math.abs(yC - yO))}
-                fill={up ? 'none' : col} stroke={col} strokeWidth="1" />
-            </g>
-          );
-        })}
-
-        {hover !== null && (
-          <line x1={x(hover)} x2={x(hover)} y1={PAD.top} y2={totalH - PAD.bottom}
-            stroke="var(--text-muted)" strokeWidth="1" opacity="0.4" />
-        )}
-
-        {candles.map((b, i) => (i % tickStride === 0 ? (
-          <text key={i} x={x(i)} y={totalH - 6} textAnchor="middle"
-            fill="var(--text-dim)" fontSize="9" fontFamily="var(--font-mono)">
-            {candleLabel(b, isDaily)}
-          </text>
-        ) : null))}
-      </svg>
-
-      {shown && (
-        <div style={{
-          position: 'absolute', top: 6,
-          left: x(shownIdx) > plotW / 2 ? 12 : undefined,
-          right: x(shownIdx) > plotW / 2 ? undefined : PAD.right + 12,
-          background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: 4,
-          padding: '6px 9px', fontFamily: 'var(--font-mono)', fontSize: 10,
-          color: 'var(--text-muted)', pointerEvents: 'none', lineHeight: 1.6, minWidth: 118,
-        }}>
-          <div style={{ color: 'var(--text)' }}>{candleLabel(shown, isDaily)}{isDaily ? '' : ' ET'}</div>
-          <div>O {fmtNum(shown.o)} H {fmtNum(shown.h)}</div>
-          <div>L {fmtNum(shown.l)} C {fmtNum(shown.c)}</div>
-          {showVolume && <div>Vol {shown.v.toLocaleString()}</div>}
-          {vwap && vwap[shownIdx] !== null && (
-            <div style={{ color: 'var(--amber)' }}>VWAP {fmtNum(vwap[shownIdx])}</div>
+    <div>
+      {!L && <div className="orb-empty">Nothing revealed yet — step forward or press play.</div>}
+      {L && (
+        <div className="orb-mono-sm" style={{ marginBottom: 6, display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+          <span style={{ color: 'var(--text)' }}>
+            {isDaily ? L.bar.d : `${L.bar.d} ${minsToHHMM(L.bar.m)} ET`}
+          </span>
+          <span>O {fmtNum(L.bar.o)} H {fmtNum(L.bar.h)} L {fmtNum(L.bar.l)} C {fmtNum(L.bar.c)}</span>
+          {showVolume && <span>Vol {L.bar.v.toLocaleString()}</span>}
+          {L.vwapVal !== null && L.vwapVal !== undefined && (
+            <span style={{ color: 'var(--amber)' }}>VWAP {fmtNum(L.vwapVal)}</span>
           )}
-          {emaLines.map(e => (e.values[shownIdx] !== null && e.values[shownIdx] !== undefined ? (
-            <div key={e.period} style={{ color: colorFor(e.period) }}>
-              EMA{e.period} {fmtNum(e.values[shownIdx])}
-            </div>
-          ) : null))}
+          {L.emaVals.filter(e => e.value !== null && e.value !== undefined).map(e => (
+            <span key={e.period} style={{ color: colorFor(e.period) }}>EMA{e.period} {fmtNum(e.value)}</span>
+          ))}
         </div>
       )}
+      <div ref={containerRef} />
     </div>
   );
-}
+});
 
 export default function ChartReplay() {
   const [tickers, setTickers] = useState([]);
@@ -204,7 +232,6 @@ export default function ChartReplay() {
   const [, bump1m] = useState(0); // re-render on background job progress
 
   const [intervalKey, setIntervalKey] = useState('5min');
-  const [viewport, setViewport] = useState(120);
   const [cursor, setCursor] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [speedMs, setSpeedMs] = useState(SPEEDS[1].ms);
@@ -217,6 +244,7 @@ export default function ChartReplay() {
 
   const [width, setWidth] = useState(880);
   const wrapRef = useRef(null);
+  const chartRef = useRef(null);
   const emaColorMap = useRef(new Map());
   const nextColorIdx = useRef(0);
 
@@ -347,12 +375,18 @@ export default function ChartReplay() {
     return () => clearTimeout(id);
   }, [playing, cursor, total, speedMs]);
 
-  const windowStart = Math.max(0, cursor - viewport);
-  const visibleCandles = candles.slice(windowStart, cursor);
-  const visibleEma = useMemo(
-    () => emaSeriesFull.map(e => ({ period: e.period, values: e.values.slice(windowStart, cursor) })),
-    [emaSeriesFull, windowStart, cursor]);
-  const visibleVwap = vwapFull ? vwapFull.slice(windowStart, cursor) : null;
+  // The chart gets every revealed candle (not a fixed-size window) — panning
+  // and zooming across that history is lightweight-charts' own drag/scroll,
+  // not custom code here. Memoized so an unrelated re-render (e.g. typing in
+  // the EMA input) doesn't hand the chart a new-but-identical array and make
+  // it re-push data for no reason.
+  const revealed = useMemo(() => candles.slice(0, cursor), [candles, cursor]);
+  const revealedEma = useMemo(
+    () => emaSeriesFull.map(e => ({ period: e.period, values: e.values.slice(0, cursor) })),
+    [emaSeriesFull, cursor]);
+  const revealedVwap = useMemo(
+    () => (vwapFull ? vwapFull.slice(0, cursor) : null),
+    [vwapFull, cursor]);
 
   const stepBack = useCallback(() => { setPlaying(false); setCursor(c => Math.max(1, c - 1)); }, []);
   const stepFwd = useCallback(() => { setPlaying(false); setCursor(c => Math.min(total, c + 1)); }, [total]);
@@ -440,13 +474,6 @@ export default function ChartReplay() {
                   </option>
                 );
               })}
-            </select>
-          </div>
-
-          <div className="orb-field" style={{ maxWidth: 110 }}>
-            <label>VIEWPORT</label>
-            <select value={viewport} onChange={e => setViewport(Number(e.target.value))}>
-              {VIEWPORTS.map(v => <option key={v} value={v}>{v} bars</option>)}
             </select>
           </div>
 
@@ -603,6 +630,11 @@ export default function ChartReplay() {
             ))}
           </div>
 
+          <button className="orb-btn small" title="Scroll the chart back to the latest revealed candle"
+            onClick={() => chartRef.current && chartRef.current.scrollToNow()}>
+            ⟲ NOW
+          </button>
+
           <span className="orb-mono-sm orb-spacer">
             Candle {Math.min(cursor, total)} / {total}
           </span>
@@ -620,9 +652,10 @@ export default function ChartReplay() {
         )}
         {!loading && total > 0 && (
           <ReplayChart
-            candles={visibleCandles}
-            emaLines={visibleEma}
-            vwap={showVWAP && !interval.daily ? visibleVwap : null}
+            ref={chartRef}
+            candles={revealed}
+            emaLines={revealedEma}
+            vwap={showVWAP && !interval.daily ? revealedVwap : null}
             showVolume={showVolume}
             isDaily={!!interval.daily}
             width={width - 34}
@@ -650,9 +683,10 @@ export default function ChartReplay() {
         1-MINUTE DATA download above for this ticker and date range, cached in its own store from
         then on. VWAP resets at the start of every session; EMAs are seeded with a simple average of
         their first period and only start drawing once seeded, so a long period (e.g. EMA 200) needs
-        that many bars of history in view before a line appears. Stepping, playback and the scrubber
-        all reveal more of the same underlying series — nothing is recomputed differently at
-        different speeds.
+        that many bars of history in view before a line appears. Drag the chart to pan across
+        already-revealed history and scroll to zoom — ⟲ NOW jumps back to the latest candle. Stepping,
+        playback and the scrubber reveal more of the same underlying series; nothing is recomputed
+        differently at different speeds.
       </p>
     </div>
   );
