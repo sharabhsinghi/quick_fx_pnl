@@ -2,6 +2,7 @@ import React, {
   useState, useEffect, useMemo, useRef, useCallback, forwardRef, useImperativeHandle,
 } from 'react';
 import { createChart, CandlestickSeries, HistogramSeries, LineSeries, ColorType } from 'lightweight-charts';
+import { DrawingsPrimitive, hitTestDrawing } from '../orb/drawings';
 import {
   getStoredTickers, getIntradayByDay, getDailyBars,
   getIntraday1mByDay, deleteTicker1mData,
@@ -26,6 +27,11 @@ const SPEEDS = [
   { ms: 120, label: 'FASTEST' },
 ];
 const EMA_PRESETS = [9, 21, 50, 100, 200];
+const TOOLS = [
+  { key: 'trend', label: 'TRENDLINE', color: 'var(--blue)' },
+  { key: 'ray', label: 'H-RAY', color: '#b388ff' },
+  { key: 'fib', label: 'FIB', color: 'var(--amber)' },
+];
 const toSec = (ms) => Math.floor(ms / 1000);
 
 /**
@@ -37,18 +43,45 @@ const toSec = (ms) => Math.floor(ms / 1000);
  * longer fits the data).
  */
 const ReplayChart = forwardRef(function ReplayChart(
-  { candles, emaLines, vwap, showVolume, width, isDaily, colorFor }, ref,
+  {
+    candles, emaLines, vwap, showVolume, width, isDaily, colorFor,
+    drawings, activeTool, onCommitDrawing, onUpdateDrawing,
+  }, ref,
 ) {
   const containerRef = useRef(null);
   const chartRef = useRef(null);
-  const seriesRef = useRef({ candle: null, volume: null, vwap: null, ema: new Map(), colors: {} });
+  const seriesRef = useRef({ candle: null, volume: null, vwap: null, ema: new Map(), colors: {}, drawPrimitive: null });
   const lookupRef = useRef(new Map()); // time (sec) -> { bar, vwapVal, emaVals }
   const isDailyRef = useRef(isDaily);
+  const candlesRef = useRef(candles);
+  const activeToolRef = useRef(activeTool);
+  const pendingRef = useRef(null); // first anchor point of a 2-click tool, while placing
+  const onCommitRef = useRef(onCommitDrawing);
+  const drawingsRef = useRef(drawings);
+  const onUpdateRef = useRef(onUpdateDrawing);
+  const dragRef = useRef(null); // { id, part, orig, start } while dragging an existing drawing
   const [legend, setLegend] = useState(null);
 
   useImperativeHandle(ref, () => ({
     scrollToNow() { chartRef.current && chartRef.current.timeScale().scrollToRealTime(); },
   }), []);
+
+  // Pixel point (relative to the chart container) -> {time, price}. Falls
+  // back to the latest revealed candle's time when the point maps to no bar
+  // (e.g. clicked/dragged into the empty margin past the data).
+  const resolvePoint = useCallback((point) => {
+    const chart = chartRef.current, series = seriesRef.current.candle;
+    if (!chart || !series) return null;
+    const price = series.coordinateToPrice(point.y);
+    if (price === null) return null;
+    let time = chart.timeScale().coordinateToTime(point.x);
+    if (time === undefined || time === null) {
+      const last = candlesRef.current[candlesRef.current.length - 1];
+      if (!last) return null;
+      time = toSec(last.t);
+    }
+    return { time, price };
+  }, []);
 
   // Created once. Colors are read from the live theme at creation time.
   // shortcut: won't recolor if the user flips light/dark while this is open — reopen the tool to pick up the new theme.
@@ -86,19 +119,149 @@ const ReplayChart = forwardRef(function ReplayChart(
       borderUpColor: col('--green'), borderDownColor: col('--red'),
       wickUpColor: col('--green'), wickDownColor: col('--red'),
     });
+
+    const drawPrimitive = new DrawingsPrimitive({ trend: col('--blue'), ray: '#b388ff', fib: col('--amber') });
+    seriesRef.current.candle.attachPrimitive(drawPrimitive);
+    seriesRef.current.drawPrimitive = drawPrimitive;
+
+    chart.subscribeClick((param) => {
+      // A drag (handled below, outside the library's own click/pan handling)
+      // takes priority — subscribeClick only fires for an actual click.
+      const tool = activeToolRef.current;
+      if (!tool || !param.point) return;
+      const pt = resolvePoint(param.point);
+      if (!pt) return;
+      if (tool === 'ray') {
+        onCommitRef.current && onCommitRef.current({ tool, t1: pt.time, p1: pt.price });
+        return;
+      }
+      if (!pendingRef.current) { pendingRef.current = pt; return; }
+      const first = pendingRef.current;
+      pendingRef.current = null;
+      drawPrimitive.setPreview(null);
+      onCommitRef.current && onCommitRef.current({ tool, t1: first.time, p1: first.price, t2: pt.time, p2: pt.price });
+    });
+
     chart.subscribeCrosshairMove((param) => {
       setLegend((param && param.time && lookupRef.current.get(param.time)) || null);
+
+      const tool = activeToolRef.current;
+      if (tool && tool !== 'ray' && pendingRef.current && param && param.point) {
+        const pt = resolvePoint(param.point);
+        if (pt) {
+          drawPrimitive.setPreview({
+            tool, t1: pendingRef.current.time, p1: pendingRef.current.price, t2: pt.time, p2: pt.price, preview: true,
+          });
+        }
+      }
+
+      // Hint that an existing drawing (or its endpoint) can be grabbed, as
+      // long as we're not mid-placement of a new one or mid-drag already.
+      if (!tool && !dragRef.current && param && param.point && containerRef.current) {
+        const hit = [...drawingsRef.current].reverse()
+          .map(d => hitTestDrawing(chart.timeScale(), seriesRef.current.candle, param.point, d))
+          .find(Boolean);
+        containerRef.current.style.cursor = hit ? (hit.part === 'body' ? 'move' : 'grab') : '';
+      }
     });
 
     return () => {
       chart.remove();
       chartRef.current = null;
-      seriesRef.current = { candle: null, volume: null, vwap: null, ema: new Map(), colors: seriesRef.current.colors };
+      seriesRef.current = { candle: null, volume: null, vwap: null, ema: new Map(), colors: seriesRef.current.colors, drawPrimitive: null };
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { isDailyRef.current = isDaily; }, [isDaily]);
+  useEffect(() => { candlesRef.current = candles; }, [candles]);
+  useEffect(() => { onCommitRef.current = onCommitDrawing; }, [onCommitDrawing]);
+  useEffect(() => { onUpdateRef.current = onUpdateDrawing; }, [onUpdateDrawing]);
+  useEffect(() => { drawingsRef.current = drawings; }, [drawings]);
+
+  // Switching tools (including turning the current one off) abandons any
+  // half-placed shape rather than leaving a dangling first anchor around.
+  useEffect(() => {
+    activeToolRef.current = activeTool;
+    pendingRef.current = null;
+    seriesRef.current.drawPrimitive && seriesRef.current.drawPrimitive.setPreview(null);
+  }, [activeTool]);
+
+  useEffect(() => {
+    seriesRef.current.drawPrimitive && seriesRef.current.drawPrimitive.setDrawings(drawings);
+  }, [drawings]);
   useEffect(() => { chartRef.current && chartRef.current.applyOptions({ width }); }, [width]);
+
+  // Drag an existing drawing (whole line) or one of its endpoints. Registered
+  // on the container with capture:true so it runs — and, on a hit, stops
+  // propagation — before lightweight-charts' own mousedown handler, which
+  // would otherwise also start panning the chart for the same drag.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return undefined;
+
+    const mediaPoint = (e) => {
+      const rect = el.getBoundingClientRect();
+      return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    };
+
+    const onMouseDown = (e) => {
+      if (activeToolRef.current) return; // placing a new drawing — not editing
+      const chart = chartRef.current, series = seriesRef.current.candle;
+      if (!chart || !series) return;
+      const px = mediaPoint(e);
+      const ts = chart.timeScale();
+      const list = drawingsRef.current;
+      let found = null;
+      for (let i = list.length - 1; i >= 0; i--) {
+        const hit = hitTestDrawing(ts, series, px, list[i]);
+        if (hit) { found = { drawing: list[i], part: hit.part }; break; }
+      }
+      if (!found) return;
+      const start = resolvePoint(px);
+      if (!start) return;
+      e.preventDefault();
+      e.stopPropagation();
+      chart.applyOptions({ handleScroll: false, handleScale: false });
+      dragRef.current = { id: found.drawing.id, part: found.part, orig: found.drawing, start, live: null };
+    };
+
+    const onMouseMove = (e) => {
+      if (!dragRef.current) return;
+      const pt = resolvePoint(mediaPoint(e));
+      if (!pt) return;
+      const { id, part, orig, start } = dragRef.current;
+      let next;
+      if (part === 'body') {
+        const dt = pt.time - start.time, dp = pt.price - start.price;
+        next = { ...orig, t1: orig.t1 + dt, p1: orig.p1 + dp };
+        if (orig.tool !== 'ray') { next.t2 = orig.t2 + dt; next.p2 = orig.p2 + dp; }
+      } else if (part === 'p1') {
+        next = { ...orig, t1: pt.time, p1: pt.price };
+      } else {
+        next = { ...orig, t2: pt.time, p2: pt.price };
+      }
+      dragRef.current.live = next;
+      seriesRef.current.drawPrimitive && seriesRef.current.drawPrimitive.setDrawings(
+        drawingsRef.current.map(d => (d.id === id ? next : d)));
+    };
+
+    const onMouseUp = () => {
+      if (!dragRef.current) return;
+      const { id, live } = dragRef.current;
+      dragRef.current = null;
+      chartRef.current && chartRef.current.applyOptions({ handleScroll: true, handleScale: true });
+      if (live && onUpdateRef.current) onUpdateRef.current(id, live);
+    };
+
+    el.addEventListener('mousedown', onMouseDown, { capture: true });
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    return () => {
+      el.removeEventListener('mousedown', onMouseDown, { capture: true });
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+  }, [resolvePoint]);
 
   // Add/remove the volume histogram to match the toggle.
   useEffect(() => {
@@ -241,6 +404,41 @@ export default function ChartReplay() {
   const [emaPeriods, setEmaPeriods] = useState([9, 21]);
   const [newEma, setNewEma] = useState('');
   const [jumpDate, setJumpDate] = useState('');
+
+  // Drawings are keyed by ticker (not by timeframe) — time/price are real
+  // values, so a trendline drawn on 5-min stays valid when you switch to 1H.
+  const [drawingsByTicker, setDrawingsByTicker] = useState({});
+  const [activeTool, setActiveTool] = useState(null); // null | 'trend' | 'ray' | 'fib'
+  const drawings = drawingsByTicker[ticker] || [];
+
+  const commitDrawing = useCallback((d) => {
+    const id = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now());
+    setDrawingsByTicker(prev => ({ ...prev, [ticker]: [...(prev[ticker] || []), { ...d, id }] }));
+    setActiveTool(null);
+  }, [ticker]);
+
+  const removeDrawing = useCallback((id) => {
+    setDrawingsByTicker(prev => ({ ...prev, [ticker]: (prev[ticker] || []).filter(d => d.id !== id) }));
+  }, [ticker]);
+
+  // Called once, on mouseup, after a drag (whole line or a single endpoint)
+  // finishes — intermediate positions during the drag never touch React state.
+  const updateDrawing = useCallback((id, next) => {
+    setDrawingsByTicker(prev => ({
+      ...prev, [ticker]: (prev[ticker] || []).map(d => (d.id === id ? next : d)),
+    }));
+  }, [ticker]);
+
+  const clearDrawings = useCallback(() => {
+    setDrawingsByTicker(prev => ({ ...prev, [ticker]: [] }));
+  }, [ticker]);
+
+  useEffect(() => {
+    if (!activeTool) return undefined;
+    const onKey = (e) => { if (e.key === 'Escape') setActiveTool(null); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [activeTool]);
 
   const [width, setWidth] = useState(880);
   const wrapRef = useRef(null);
@@ -646,6 +844,43 @@ export default function ChartReplay() {
       </div>
 
       <div className="orb-card" ref={wrapRef}>
+        <div className="orb-controls" style={{ marginBottom: 10 }}>
+          <div className="orb-toggle">
+            <span className="lbl">DRAW</span>
+            {TOOLS.map(t => (
+              <button key={t.key} className={activeTool === t.key ? 'active' : ''}
+                style={activeTool === t.key ? { color: t.color, borderColor: t.color } : undefined}
+                onClick={() => setActiveTool(cur => (cur === t.key ? null : t.key))}>
+                {t.label}
+              </button>
+            ))}
+            {activeTool && (
+              <span className="orb-mono-sm">
+                {activeTool === 'ray' ? 'click a point' : 'click two points'} · Esc cancels
+              </span>
+            )}
+            {!activeTool && drawings.length > 0 && (
+              <span className="orb-mono-sm">drag a line or its endpoints to adjust it</span>
+            )}
+          </div>
+
+          <div className="orb-chips" style={{ marginTop: 0 }}>
+            {drawings.map((d) => {
+              const tool = TOOLS.find(t => t.key === d.tool);
+              return (
+                <span key={d.id} className="orb-chip" style={{ borderColor: tool.color, color: tool.color }}>
+                  {tool.label}
+                  <button title="Remove" onClick={() => removeDrawing(d.id)}>×</button>
+                </span>
+              );
+            })}
+          </div>
+
+          {drawings.length > 0 && (
+            <button className="orb-btn small" onClick={clearDrawings}>CLEAR DRAWINGS</button>
+          )}
+        </div>
+
         {loading && <div className="orb-empty">Loading {ticker}…</div>}
         {!loading && data && total === 0 && (
           <div className="orb-empty">No cached bars for {ticker} at this timeframe.</div>
@@ -660,6 +895,10 @@ export default function ChartReplay() {
             isDaily={!!interval.daily}
             width={width - 34}
             colorFor={colorFor}
+            drawings={drawings}
+            activeTool={activeTool}
+            onCommitDrawing={commitDrawing}
+            onUpdateDrawing={updateDrawing}
           />
         )}
 
@@ -686,7 +925,9 @@ export default function ChartReplay() {
         that many bars of history in view before a line appears. Drag the chart to pan across
         already-revealed history and scroll to zoom — ⟲ NOW jumps back to the latest candle. Stepping,
         playback and the scrubber reveal more of the same underlying series; nothing is recomputed
-        differently at different speeds.
+        differently at different speeds. DRAW tools place a trendline or Fibonacci retracement on two
+        clicks, or a horizontal ray on one — drawings are kept per ticker (not per timeframe), since
+        a line's time and price stay valid across resolutions.
       </p>
     </div>
   );

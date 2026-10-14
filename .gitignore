@@ -6,6 +6,9 @@ build/
 out/
 .next/
 
+# graphify knowledge-graph output
+graphify-out/
+
 # Environment variables
 .env
 .env.local
