@@ -183,6 +183,15 @@ export default function App() {
     setHistory([]);
   }, []);
 
+  // Closed trades from the Practice Futures simulator.
+  const addHistoryEntry = useCallback((entry) => {
+    const tmpId = `tmp_${Date.now()}`;
+    setHistory(h => [{ ...entry, id: tmpId }, ...h]);
+    addHistory(entry)
+      .then(newId => setHistory(h => h.map(e => (e.id === tmpId ? { ...e, id: newId } : e))))
+      .catch(() => {});
+  }, []);
+
   const deleteHistoryEntry = useCallback((id) => {
     deleteHistory(id).catch(() => {});
     setHistory(prev => prev.filter(t => t.id !== id));
@@ -254,7 +263,7 @@ export default function App() {
                 usdRate={usdRate}
               />
         )}
-        {tab === 'calculators' && <Calculators trades={trades} onOpen={handleOpen} onOpenForm={handleOpenForm} accountCurrency={accountCurrency} accountSize={accountSize} usdRate={usdRate} />}
+        {tab === 'calculators' && <Calculators trades={trades} onOpen={handleOpen} onOpenForm={handleOpenForm} onAddHistory={addHistoryEntry} accountCurrency={accountCurrency} accountSize={accountSize} usdRate={usdRate} />}
         {tab === 'history' && <TradeHistory history={history} onClear={clearHistory} onDelete={deleteHistoryEntry} accountCurrency={accountCurrency} accountSize={accountSize} usdRate={usdRate} />}
         {tab === 'analytics' && <Analytics history={history} accountCurrency={accountCurrency} accountSize={accountSize} usdRate={usdRate} />}
       </main>

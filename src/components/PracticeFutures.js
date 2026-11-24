@@ -8,7 +8,8 @@ import {
 } from '../futures/data';
 import {
   INSTRUMENTS, ORDER_TYPES, START_BALANCE, newAccount, placeOrder, processBar, cancelOrder, closePosition,
-  equity, unrealized, ddThreshold, setDrawdownLimit, resetDrawdown,
+  equity, unrealized, ddThreshold, setDrawdownLimit, resetDrawdown, setDailyLimit, setFee, feeFor,
+  modifyOrder, updateTrade,
 } from '../futures/engine';
 
 const TIMEFRAMES = [1, 2, 3, 5, 15, 30, 60, 240, 1440];
@@ -23,6 +24,10 @@ const TOOLS = [
   { key: 'hline', label: 'H-LINE', color: '#26c6da' },
   { key: 'ray', label: 'H-RAY', color: '#b388ff' },
   { key: 'fib', label: 'FIB', color: 'var(--amber)' },
+];
+const CLICK_TOOLS = [
+  { key: 'buyAt', label: 'BUY @ CLICK', color: 'var(--green)' },
+  { key: 'sellAt', label: 'SELL @ CLICK', color: 'var(--red)' },
 ];
 const EMA_COLOR = { 9: '#40c4ff', 21: '#f06292' };
 const DAY = 86400000;
@@ -49,8 +54,21 @@ const etInputToMs = (s) => { const guess = Date.parse(s + ':00Z'); return guess 
 const msToEtInput = (ms) => { const b = withEtFields({ t: ms }); return `${b.d}T${minsToHHMM(b.m)}`; };
 const fmtEt = (ms) => { const b = withEtFields({ t: ms }); return `${b.d} ${minsToHHMM(b.m)} ET`; };
 const isoDay = (ms) => new Date(ms).toISOString().slice(0, 10);
+const pnlColor = (v) => (v > 0 ? 'var(--green)' : v < 0 ? 'var(--red)' : undefined);
 
-export default function PracticeFutures() {
+// Higher-timeframe candles + indicators from the revealed 1-min bars.
+function buildView(revealed, tf, ind) {
+  const candles = aggregate(revealed, tf);
+  const closes = candles.map(c => c.c);
+  return {
+    candles,
+    emaLines: [9, 21].filter(p => ind['ema' + p]).map(period => ({ period, values: computeEMA(closes, period) })),
+    vwap: ind.vwap ? anchoredVWAP(candles.map(c => ({ ...c, d: c.sess }))) : null,
+    rsi: ind.rsi ? rsiSeries(closes) : null,
+  };
+}
+
+export default function PracticeFutures({ onAddHistory }) {
   const [loaded, setLoaded] = useState(false);
   const [apiKey, setApiKey] = useState('');
   const [keyInput, setKeyInput] = useState('');
@@ -61,6 +79,8 @@ export default function PracticeFutures() {
 
   const [root, setRoot] = useState('ES');
   const [tf, setTf] = useState(5);
+  const [tf2, setTf2] = useState(60);
+  const [split, setSplit] = useState(false);
   const [ind, setInd] = useState(DEFAULT_IND);
   const [speedMs, setSpeedMs] = useState(1000);
   const [startInput, setStartInput] = useState('');
@@ -72,6 +92,7 @@ export default function PracticeFutures() {
   const [acct, setAcct] = useState(() => newAccount());
   const [ticket, setTicket] = useState(DEFAULT_TICKET);
   const [ddInput, setDdInput] = useState('');
+  const [dailyInput, setDailyInput] = useState('');
 
   const [drawingsByRoot, setDrawingsByRoot] = useState({});
   const [activeTool, setActiveTool] = useState(null);
@@ -80,6 +101,7 @@ export default function PracticeFutures() {
   const [width, setWidth] = useState(880);
   const wrapRef = useRef(null);
   const chartRef = useRef(null);
+  const chartRef2 = useRef(null);
 
   const hasExposure = Object.keys(acct.positions).length > 0 || acct.orders.length > 0;
   const now = idx >= 0 ? bars[idx] : null;
@@ -103,9 +125,9 @@ export default function PracticeFutures() {
         kvGet('apiKey', ''), getCoverage(), kvGet('account'), kvGet('ui'), kvGet('drawings', {}),
       ]);
       setApiKey(key); setKeyInput(key); setCoverage(cov); setDrawingsByRoot(dr);
-      if (saved) setAcct(saved);
+      if (saved) setAcct({ ...newAccount(), ...saved }); // fill fields added since it was saved
       if (ui) {
-        setRoot(ui.root); setTf(ui.tf); setInd({ ...DEFAULT_IND, ...ui.ind }); setSpeedMs(ui.speedMs);
+        setRoot(ui.root); setTf(ui.tf); setTf2(ui.tf2 || 60); setSplit(!!ui.split); setInd({ ...DEFAULT_IND, ...ui.ind }); setSpeedMs(ui.speedMs);
         setTicket({ ...DEFAULT_TICKET, ...ui.ticket });
         if (ui.cursorTime) { setStartInput(msToEtInput(ui.cursorTime)); await loadWindow(ui.root, ui.cursorTime); }
       }
@@ -119,10 +141,10 @@ export default function PracticeFutures() {
     if (!loaded) return undefined;
     const id = setTimeout(() => {
       kvSet('account', acct);
-      kvSet('ui', { root, tf, ind, speedMs, ticket, cursorTime });
+      kvSet('ui', { root, tf, tf2, split, ind, speedMs, ticket, cursorTime });
     }, 400);
     return () => clearTimeout(id);
-  }, [loaded, acct, root, tf, ind, speedMs, ticket, cursorTime]);
+  }, [loaded, acct, root, tf, tf2, split, ind, speedMs, ticket, cursorTime]);
   useEffect(() => { if (loaded) kvSet('drawings', drawingsByRoot); }, [loaded, drawingsByRoot]);
 
   useEffect(() => {
@@ -176,14 +198,9 @@ export default function PracticeFutures() {
   };
 
   // ── chart data ──
-  const candles = useMemo(() => (idx < 0 ? [] : aggregate(bars.slice(0, idx + 1), tf)), [bars, idx, tf]);
-  const emaLines = useMemo(() => {
-    const closes = candles.map(c => c.c);
-    return [9, 21].filter(p => ind['ema' + p]).map(period => ({ period, values: computeEMA(closes, period) }));
-  }, [candles, ind]);
-  const vwap = useMemo(
-    () => (ind.vwap ? anchoredVWAP(candles.map(c => ({ ...c, d: c.sess }))) : null), [candles, ind.vwap]);
-  const rsi = useMemo(() => (ind.rsi ? rsiSeries(candles.map(c => c.c)) : null), [candles, ind.rsi]);
+  const revealed = useMemo(() => (idx < 0 ? [] : bars.slice(0, idx + 1)), [bars, idx]);
+  const view = useMemo(() => buildView(revealed, tf, ind), [revealed, tf, ind]);
+  const view2 = useMemo(() => (split ? buildView(revealed, tf2, ind) : null), [split, revealed, tf2, ind]);
 
   const css = useMemo(() => {
     const s = getComputedStyle(document.documentElement);
@@ -197,8 +214,10 @@ export default function PracticeFutures() {
     acct.orders.filter(o => mine(o.inst)).forEach((o) => {
       const color = o.label === 'TP' ? css.green : o.reduceOnly ? css.red : css.amber;
       const title = `${o.label || o.type.toUpperCase()} ${o.side === 'buy' ? 'B' : 'S'}${o.qty}`;
-      if (o.type === 'stopLimit') lines.push({ price: o.stop, color, title: title + ' stop', dashed: true });
-      lines.push({ price: o.type === 'limit' || o.type === 'stopLimit' ? o.price : o.stop, color, title, dashed: true });
+      // `id` + `field` make the line draggable on the chart.
+      if (o.type === 'stopLimit') lines.push({ id: o.id, field: 'stop', price: o.stop, color, title: title + ' stop', dashed: true });
+      const field = o.type === 'limit' || o.type === 'stopLimit' ? 'price' : 'stop';
+      lines.push({ id: o.id, field, price: o[field], color, title, dashed: true });
     });
     return lines;
   }, [acct.positions, acct.orders, root, css]);
@@ -214,15 +233,55 @@ export default function PracticeFutures() {
   const removeDrawing = (id) => setDrawingsByRoot(prev => ({ ...prev, [root]: (prev[root] || []).filter(d => d.id !== id) }));
 
   // ── orders ──
-  const submit = (side) => {
-    const num = (v) => (v === '' ? undefined : Number(v));
+  const num = (v) => (v === '' || v == null ? undefined : Number(v));
+  const send = (order) => {
     const { acct: next, error } = placeOrder(acct, {
-      inst: ticket.inst, side, qty: Number(ticket.qty), type: ticket.type,
-      price: num(ticket.price), stop: num(ticket.stop), trail: num(ticket.trail),
-      tpPts: num(ticket.tpPts), slPts: num(ticket.slPts), slTrail: ticket.slTrail,
+      inst: ticket.inst, qty: Number(ticket.qty),
+      tpPts: num(ticket.tpPts), slPts: num(ticket.slPts), slTrail: ticket.slTrail, ...order,
     }, now && now.t);
     setMsg(error);
     if (!error) setAcct(next);
+  };
+  const submit = (side) => send({
+    side, type: ticket.type, price: num(ticket.price), stop: num(ticket.stop), trail: num(ticket.trail),
+  });
+  // Clicked price on the chart: below market buys with a limit / sells with a stop, above is the reverse.
+  const onPriceClick = useCallback((tool, price) => {
+    setActiveTool(null);
+    const last = acct.last[root];
+    const side = tool === 'buyAt' ? 'buy' : 'sell';
+    const limit = side === 'buy' ? price < last : price > last;
+    send(limit ? { side, type: 'limit', price } : { side, type: 'stop', stop: price });
+  }); // eslint-disable-line react-hooks/exhaustive-deps
+  const onMoveLine = useCallback((line, price) => setAcct(a => modifyOrder(a, line.id, line.field, price)), []);
+
+  // ── journal ──
+  const journal = useMemo(() => {
+    const groups = {};
+    (acct.trades || []).forEach((t) => {
+      const sess = withEtFields({ t: t.entryTime }).sess;
+      (groups[sess] = groups[sess] || []).push(t);
+    });
+    return Object.entries(groups).sort((a, b) => b[0].localeCompare(a[0]));
+  }, [acct.trades]);
+
+  const sendToHistory = (t) => {
+    if (!onAddHistory) return;
+    onAddHistory({
+      key: 'FUT_' + t.inst,
+      meta: { display: `${t.inst} (sim)`, pipSize: INSTRUMENTS[t.inst].tick },
+      side: t.side, entry: t.entry, closePrice: t.exit,
+      // History requires numbers here; a trade without a bracket falls back to entry/exit.
+      sl: t.sl != null ? t.sl : t.entry, tp: t.tp != null ? t.tp : t.exit,
+      lotSize: t.maxQty * 100000, // History shows lotSize/100000 as "lots" -> contracts
+      openedAt: new Date(t.entryTime).toISOString(), closedAt: new Date(t.exitTime).toISOString(),
+      pips: (t.exit - t.entry) * (t.side === 'buy' ? 1 : -1), // points
+      plUsd: t.net,
+      openNotes: '',
+      closeNotes: ['Practice Futures', t.r != null ? `${t.r.toFixed(2)}R` : null, t.note].filter(Boolean).join(' · '),
+      checklist: [],
+    });
+    setAcct(a => updateTrade(a, t.id, { sent: true }));
   };
   const T = (k) => (e) => setTicket(t => ({ ...t, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }));
 
@@ -269,12 +328,18 @@ export default function PracticeFutures() {
         <div className="orb-metric"><div className="k">TOTAL P&amp;L</div>
           <div className={`v ${eq - acct.startBalance > 0 ? 'pos' : eq < acct.startBalance ? 'neg' : ''}`}>{fmtMoney(eq - acct.startBalance)}</div>
           <div className="s">{closing.length} exits · {closing.length ? Math.round((wins / closing.length) * 100) : 0}% win</div></div>
+        <div className="orb-metric"><div className="k">DAILY LOSS</div>
+          <div className={`v ${acct.dayLocked ? 'neg' : ''}`}>{!acct.dailyLimit ? 'OFF' : acct.dayLocked ? 'LOCKED' : fmtMoney(eq - (acct.dayStart - acct.dailyLimit))}</div>
+          <div className="s">{acct.dailyLimit ? `limit ${fmtMoney(acct.dailyLimit, 0)} · today ${fmtMoney(eq - acct.dayStart)}` : 'no limit set'}</div></div>
         <div className="orb-metric"><div className="k">TRAILING DD</div>
           <div className={`v ${acct.breached ? 'neg' : ''}`}>{th == null ? 'OFF' : acct.breached ? 'BREACHED' : fmtMoney(eq - th)}</div>
           <div className="s">{th == null ? 'no limit set' : `${acct.breached ? 'locked' : 'room left'} · floor ${fmtMoney(th)}`}</div></div>
       </div>
       {acct.breached && (
         <div className="orb-banner error">Trailing drawdown limit hit — positions were flattened and trading is locked. Reset the limit below to continue.</div>
+      )}
+      {acct.dayLocked && (
+        <div className="orb-banner error">Daily loss limit hit — positions were flattened. Trading unlocks at the next session open (18:00 ET).</div>
       )}
       {msg && <div className="orb-banner warn">{msg}</div>}
 
@@ -328,7 +393,7 @@ export default function PracticeFutures() {
               <button key={s.ms} className={speedMs === s.ms ? 'active' : ''} onClick={() => setSpeedMs(s.ms)}>{s.label}</button>
             ))}
           </div>
-          <button className="orb-btn small" onClick={() => chartRef.current && chartRef.current.scrollToNow()}>⟲ NOW</button>
+          <button className="orb-btn small" onClick={() => [chartRef, chartRef2].forEach(r => r.current && r.current.scrollToNow())}>⟲ NOW</button>
           <span className="orb-mono-sm orb-spacer">
             {now ? `${fmtEt(now.t)} · last ${fmtNum(now.c)}` : 'pick a start time'} · space = play/pause, → = step
           </span>
@@ -344,9 +409,28 @@ export default function PracticeFutures() {
               <button key={t.key} className={activeTool === t.key ? 'active' : ''}
                 onClick={() => setActiveTool(cur => (cur === t.key ? null : t.key))}>{t.label}</button>
             ))}
-            {activeTool && <span className="orb-mono-sm">{['ray', 'hline'].includes(activeTool) ? 'click a point' : 'click two points'} · Esc cancels</span>}
-            {!activeTool && drawings.length > 0 && <span className="orb-mono-sm">drag a line or its ends to move it</span>}
           </div>
+          <div className="orb-toggle">
+            <span className="lbl">ORDER</span>
+            {CLICK_TOOLS.map(t => (
+              <button key={t.key} className={activeTool === t.key ? 'active' : ''} disabled={!now}
+                onClick={() => setActiveTool(cur => (cur === t.key ? null : t.key))}>{t.label}</button>
+            ))}
+          </div>
+          <label className="orb-check">
+            <input type="checkbox" checked={split} onChange={e => setSplit(e.target.checked)} />Split view
+          </label>
+          {split && (
+            <select className="orb-mono-sm" value={tf2} onChange={e => setTf2(Number(e.target.value))}>
+              {TIMEFRAMES.map(m => <option key={m} value={m}>{tfLabel(m)}</option>)}
+            </select>
+          )}
+          <span className="orb-mono-sm">
+            {activeTool && (['buyAt', 'sellAt'].includes(activeTool)
+              ? 'click a price — limit or stop is picked from where you click · Esc cancels'
+              : `${['ray', 'hline'].includes(activeTool) ? 'click a point' : 'click two points'} · Esc cancels`)}
+            {!activeTool && 'drag drawings or dashed order lines to move them'}
+          </span>
           <div className="orb-chips" style={{ marginTop: 0 }}>
             {drawings.map((d) => {
               const tool = TOOLS.find(t => t.key === d.tool);
@@ -358,13 +442,21 @@ export default function PracticeFutures() {
             })}
           </div>
         </div>
-        {candles.length > 0 ? (
-          <ReplayChart
-            ref={chartRef} candles={candles} emaLines={emaLines} vwap={vwap} rsi={rsi}
-            showVolume={ind.volume} isDaily={false} width={width - 34} height={ind.rsi ? 540 : 440}
-            colorFor={p => EMA_COLOR[p]} drawings={drawings} activeTool={activeTool}
-            onCommitDrawing={commitDrawing} onUpdateDrawing={updateDrawing} priceLines={priceLines}
-          />
+        {view.candles.length > 0 ? (
+          <div style={{ display: 'grid', gridTemplateColumns: split ? '1fr 1fr' : '1fr', gap: 12 }}>
+            {[[view, chartRef, tf], ...(split ? [[view2, chartRef2, tf2]] : [])].map(([v, r, t]) => (
+              <div key={r === chartRef ? 'a' : 'b'}>
+                {split && <div className="orb-mono-sm" style={{ marginBottom: 4, color: 'var(--amber)' }}>{tfLabel(t)}</div>}
+                <ReplayChart
+                  ref={r} candles={v.candles} emaLines={v.emaLines} vwap={v.vwap} rsi={v.rsi}
+                  showVolume={ind.volume} isDaily={false} width={split ? (width - 46) / 2 : width - 34} height={ind.rsi ? 540 : 440}
+                  colorFor={p => EMA_COLOR[p]} drawings={drawings} activeTool={activeTool}
+                  onCommitDrawing={commitDrawing} onUpdateDrawing={updateDrawing} priceLines={priceLines}
+                  onMoveLine={onMoveLine} onPriceClick={onPriceClick}
+                />
+              </div>
+            ))}
+          </div>
         ) : <div className="orb-empty">Download data, pick a start time and press GO TO START.</div>}
         <div className="orb-mono-sm" style={{ marginTop: 10, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
           {ind.vwap && <span style={{ color: 'var(--amber)' }}>▬ session VWAP</span>}
@@ -377,7 +469,7 @@ export default function PracticeFutures() {
       {/* ── order ticket ── */}
       <div className="orb-card">
         <div className="orb-card-head"><h3>ORDER TICKET</h3>
-          <span className="orb-mono-sm">{INSTRUMENTS[ticket.inst].name} · ${INSTRUMENTS[ticket.inst].pointValue}/pt · ${INSTRUMENTS[ticket.inst].fee}/side fee</span>
+          <span className="orb-mono-sm">{INSTRUMENTS[ticket.inst].name} · ${INSTRUMENTS[ticket.inst].pointValue}/pt · ${feeFor(acct, ticket.inst)}/side fee</span>
         </div>
         <div className="orb-grid">
           <div className="orb-field"><label>CONTRACT</label>
@@ -468,6 +560,49 @@ export default function PracticeFutures() {
         )}
       </div>
 
+      {/* ── journal ── */}
+      <div className="orb-card">
+        <div className="orb-card-head"><h3>JOURNAL</h3>
+          <span className="orb-mono-sm">Round trips by session. R = net P&amp;L ÷ planned risk (the SL you set on entry).</span></div>
+        {journal.length === 0 ? <div className="orb-mono-sm">No closed trades yet.</div> : journal.map(([sess, list]) => {
+          const net = list.reduce((s2, t) => s2 + t.net, 0);
+          const rs = list.filter(t => t.r != null);
+          const winPct = Math.round((list.filter(t => t.net > 0).length / list.length) * 100);
+          return (
+            <div key={sess} style={{ marginBottom: 14 }}>
+              <div className="orb-mono-sm" style={{ margin: '6px 0', display: 'flex', gap: 14 }}>
+                <span style={{ color: 'var(--text)' }}>SESSION {sess}</span>
+                <span>{list.length} trade{list.length === 1 ? '' : 's'}</span>
+                <span style={{ color: pnlColor(net) }}>net {fmtMoney(net)}</span>
+                <span>{winPct}% win</span>
+                {rs.length > 0 && <span>avg {(rs.reduce((s2, t) => s2 + t.r, 0) / rs.length).toFixed(2)}R · total {rs.reduce((s2, t) => s2 + t.r, 0).toFixed(2)}R</span>}
+              </div>
+              <div className="orb-scroll"><div className="orb-table">
+                <div className="r head" style={{ gridTemplateColumns: '90px 60px 50px 40px 80px 80px 90px 60px 1fr 110px' }}>
+                  <span>IN → OUT</span><span>CONTRACT</span><span>SIDE</span><span className="rt">QTY</span><span className="rt">ENTRY</span><span className="rt">EXIT</span>
+                  <span className="rt">NET</span><span className="rt">R</span><span>NOTE</span><span />
+                </div>
+                {list.map(t => (
+                  <div key={t.id} className="r" style={{ gridTemplateColumns: '90px 60px 50px 40px 80px 80px 90px 60px 1fr 110px' }}>
+                    <span className="dim">{fmtEt(t.entryTime).slice(11, 16)} → {fmtEt(t.exitTime).slice(11, 16)}</span>
+                    <span className="tk">{t.inst}</span>
+                    <span style={{ color: t.side === 'buy' ? 'var(--green)' : 'var(--red)' }}>{t.side === 'buy' ? 'LONG' : 'SHORT'}</span>
+                    <span className="rt">{t.maxQty}</span><span className="rt">{fmtNum(t.entry)}</span><span className="rt">{fmtNum(t.exit)}</span>
+                    <span className="rt" style={{ color: pnlColor(t.net) }}>{fmtMoney(t.net)}</span>
+                    <span className="rt" style={{ color: pnlColor(t.r) }}>{t.r != null ? `${t.r.toFixed(2)}R` : '—'}</span>
+                    <input className="orb-mono-sm" style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 4, padding: '4px 6px', color: 'var(--text)' }}
+                      placeholder="what did you see?" value={t.note || ''}
+                      onChange={e => { const note = e.target.value; setAcct(a => updateTrade(a, t.id, { note })); }} />
+                    {t.sent ? <span className="orb-mono-sm" style={{ color: 'var(--green)' }}>IN HISTORY ✓</span>
+                      : <button className="orb-btn small" disabled={!onAddHistory} onClick={() => sendToHistory(t)}>→ HISTORY</button>}
+                  </div>
+                ))}
+              </div></div>
+            </div>
+          );
+        })}
+      </div>
+
       {/* ── risk ── */}
       <div className="orb-card">
         <div className="orb-card-head"><h3>RISK</h3>
@@ -483,11 +618,28 @@ export default function PracticeFutures() {
           <button className="orb-btn" style={{ alignSelf: 'flex-end' }} disabled={!acct.ddLimit} onClick={() => setAcct(resetDrawdown)}>
             RESET LIMIT
           </button>
+          <div className="orb-field" style={{ maxWidth: 170 }}>
+            <label>DAILY LOSS LIMIT ($)</label>
+            <input type="number" min="0" step="100" placeholder={acct.dailyLimit ? String(acct.dailyLimit) : 'e.g. 500'} value={dailyInput} onChange={e => setDailyInput(e.target.value)} />
+          </div>
+          <button className="orb-btn" style={{ alignSelf: 'flex-end' }} onClick={() => { setAcct(a => setDailyLimit(a, Number(dailyInput))); setDailyInput(''); }}>
+            {Number(dailyInput) > 0 ? 'SET DAILY' : 'DAILY OFF'}
+          </button>
           <button className="orb-btn danger" style={{ alignSelf: 'flex-end' }} onClick={() => {
             if (window.confirm(`Reset the practice account to ${fmtMoney(START_BALANCE, 0)}? Positions, orders and fill history are wiped.`)) {
-              setAcct(a => ({ ...newAccount(START_BALANCE, a.ddLimit), last: a.last }));
+              setAcct(a => ({ ...newAccount(START_BALANCE, a.ddLimit), last: a.last, fees: a.fees, dailyLimit: a.dailyLimit }));
             }
           }}>RESET ACCOUNT</button>
+        </div>
+        <div className="orb-controls" style={{ marginTop: 12, marginBottom: 0 }}>
+          <span className="lbl orb-mono-sm">FEE PER CONTRACT PER SIDE (exchange + clearing + broker)</span>
+          {Object.keys(INSTRUMENTS).map(k => (
+            <div key={k} className="orb-field" style={{ maxWidth: 90 }}>
+              <label>{k} $</label>
+              <input type="number" min="0" step="0.01" value={feeFor(acct, k)}
+                onChange={e => { const v = e.target.value === '' ? -1 : Number(e.target.value); setAcct(a => setFee(a, k, v)); }} />
+            </div>
+          ))}
         </div>
       </div>
 

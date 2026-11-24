@@ -6,7 +6,7 @@ import ORB from './ORB';
 import PracticeFutures from './PracticeFutures';
 import TradingWizardContainer from './TradingWizard';
 
-export default function Calculators({ trades, onOpen, onOpenForm, accountCurrency, accountSize, usdRate }) {
+export default function Calculators({ trades, onOpen, onOpenForm, onAddHistory, accountCurrency, accountSize, usdRate }) {
   const [active, setActive] = useState(null); // null | 'pip' | 'pl' | 'replay' | 'orb' | 'futures' | 'wizard'
 
   const handleOpenTrade = (data) => {
@@ -131,7 +131,7 @@ export default function Calculators({ trades, onOpen, onOpenForm, accountCurrenc
       {active === 'futures' && (
         <div className="calcs-pl-wrap">
           <button className="calcs-back-btn" onClick={() => setActive(null)}>← BACK TO CALCULATORS</button>
-          <PracticeFutures />
+          <PracticeFutures onAddHistory={onAddHistory} />
         </div>
       )}
 

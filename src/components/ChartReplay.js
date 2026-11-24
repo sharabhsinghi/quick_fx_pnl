@@ -46,7 +46,7 @@ export const ReplayChart = forwardRef(function ReplayChart(
   {
     candles, emaLines, vwap, showVolume, width, isDaily, colorFor,
     drawings, activeTool, onCommitDrawing, onUpdateDrawing,
-    height = 420, rsi = null, priceLines = null,
+    height = 420, rsi = null, priceLines = null, onMoveLine = null, onPriceClick = null,
   }, ref,
 ) {
   const containerRef = useRef(null);
@@ -61,6 +61,17 @@ export const ReplayChart = forwardRef(function ReplayChart(
   const drawingsRef = useRef(drawings);
   const onUpdateRef = useRef(onUpdateDrawing);
   const dragRef = useRef(null); // { id, part, orig, start } while dragging an existing drawing
+  const priceLinesRef = useRef(priceLines);
+  const onMoveLineRef = useRef(onMoveLine);
+  const onPriceClickRef = useRef(onPriceClick);
+  // Index of a draggable price line (one with an `id`) within a few px of y, or -1.
+  const hitPriceLine = (y) => {
+    const series = seriesRef.current.candle;
+    return (priceLinesRef.current || []).findIndex((l) => {
+      const ly = l.id != null && series ? series.priceToCoordinate(l.price) : null;
+      return ly !== null && Math.abs(ly - y) <= 5;
+    });
+  };
   const [legend, setLegend] = useState(null);
 
   useImperativeHandle(ref, () => ({
@@ -132,6 +143,10 @@ export const ReplayChart = forwardRef(function ReplayChart(
       if (!tool || !param.point) return;
       const pt = resolvePoint(param.point);
       if (!pt) return;
+      if (tool === 'buyAt' || tool === 'sellAt') {
+        onPriceClickRef.current && onPriceClickRef.current(tool, pt.price);
+        return;
+      }
       if (tool === 'ray' || tool === 'hline') {
         onCommitRef.current && onCommitRef.current({ tool, t1: pt.time, p1: pt.price });
         return;
@@ -162,7 +177,8 @@ export const ReplayChart = forwardRef(function ReplayChart(
         const hit = [...drawingsRef.current].reverse()
           .map(d => hitTestDrawing(chart.timeScale(), seriesRef.current.candle, param.point, d))
           .find(Boolean);
-        containerRef.current.style.cursor = hit ? (hit.part === 'body' ? 'move' : 'grab') : '';
+        containerRef.current.style.cursor = hitPriceLine(param.point.y) >= 0
+          ? 'ns-resize' : hit ? (hit.part === 'body' ? 'move' : 'grab') : '';
       }
     });
 
@@ -178,6 +194,8 @@ export const ReplayChart = forwardRef(function ReplayChart(
   useEffect(() => { onCommitRef.current = onCommitDrawing; }, [onCommitDrawing]);
   useEffect(() => { onUpdateRef.current = onUpdateDrawing; }, [onUpdateDrawing]);
   useEffect(() => { drawingsRef.current = drawings; }, [drawings]);
+  useEffect(() => { onMoveLineRef.current = onMoveLine; }, [onMoveLine]);
+  useEffect(() => { onPriceClickRef.current = onPriceClick; }, [onPriceClick]);
 
   // Switching tools (including turning the current one off) abandons any
   // half-placed shape rather than leaving a dangling first anchor around.
@@ -210,6 +228,14 @@ export const ReplayChart = forwardRef(function ReplayChart(
       const chart = chartRef.current, series = seriesRef.current.candle;
       if (!chart || !series) return;
       const px = mediaPoint(e);
+      const lineIdx = hitPriceLine(px.y);
+      if (lineIdx >= 0) { // working order line: drag vertically to re-price it
+        e.preventDefault();
+        e.stopPropagation();
+        chart.applyOptions({ handleScroll: false, handleScale: false });
+        dragRef.current = { lineIdx, live: null };
+        return;
+      }
       const ts = chart.timeScale();
       const list = drawingsRef.current;
       let found = null;
@@ -230,6 +256,12 @@ export const ReplayChart = forwardRef(function ReplayChart(
       if (!dragRef.current) return;
       const pt = resolvePoint(mediaPoint(e));
       if (!pt) return;
+      if (dragRef.current.lineIdx !== undefined) {
+        dragRef.current.live = pt.price;
+        const h = seriesRef.current.priceLines[dragRef.current.lineIdx];
+        h && h.applyOptions({ price: pt.price });
+        return;
+      }
       const { id, part, orig, start } = dragRef.current;
       let next;
       if (part === 'body') {
@@ -248,9 +280,14 @@ export const ReplayChart = forwardRef(function ReplayChart(
 
     const onMouseUp = () => {
       if (!dragRef.current) return;
-      const { id, live } = dragRef.current;
+      const { id, live, lineIdx } = dragRef.current;
       dragRef.current = null;
       chartRef.current && chartRef.current.applyOptions({ handleScroll: true, handleScale: true });
+      if (lineIdx !== undefined) {
+        const l = priceLinesRef.current[lineIdx];
+        if (l && live != null && onMoveLineRef.current) onMoveLineRef.current(l, live);
+        return;
+      }
       if (live && onUpdateRef.current) onUpdateRef.current(id, live);
     };
 
@@ -300,6 +337,7 @@ export const ReplayChart = forwardRef(function ReplayChart(
 
   // Order / position markers as price lines on the candle series.
   useEffect(() => {
+    priceLinesRef.current = priceLines;
     const s = seriesRef.current.candle;
     if (!s) return;
     seriesRef.current.priceLines.forEach(l => s.removePriceLine(l));

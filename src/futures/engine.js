@@ -30,6 +30,8 @@ export function newAccount(startBalance = START_BALANCE, ddLimit = null) {
   return {
     startBalance, balance: startBalance, positions: {}, orders: [], fills: [],
     last: {}, ddLimit, peak: startBalance, breached: false, nextId: 1,
+    dailyLimit: null, day: null, dayStart: startBalance, dayLocked: false,
+    fees: {}, open: {}, trades: [], nextTradeId: 1,
   };
 }
 
@@ -50,6 +52,45 @@ export function equity(acct) {
 
 export function ddThreshold(acct) {
   return acct.ddLimit ? acct.peak - acct.ddLimit : null;
+}
+
+export const feeFor = (acct, inst) => (acct.fees && acct.fees[inst] != null ? acct.fees[inst] : INSTRUMENTS[inst].fee);
+
+// Round-trip bookkeeping for the journal: a trade opens when the position
+// leaves flat and closes when it returns to flat (a flip closes one, opens another).
+function trackTrade(a, order, pos, q, newQty, avg, price, time, pnl, fee) {
+  a.open = a.open || {};
+  a.trades = a.trades || [];
+  const spec = INSTRUMENTS[order.inst];
+  const perFee = fee / Math.abs(q);
+  let t = a.open[order.inst];
+  let openQty = Math.abs(q);
+  if (pos.qty && sgn(pos.qty) !== sgn(q)) {
+    const closed = Math.min(Math.abs(q), Math.abs(pos.qty));
+    t.pnl += pnl; t.fees += closed * perFee; t.exitQty += closed; t.exitValue += closed * price;
+    if (sgn(newQty) !== sgn(pos.qty)) {
+      t.exit = t.exitValue / t.exitQty;
+      t.exitTime = time;
+      t.net = t.pnl - t.fees;
+      t.r = t.risk ? t.net / t.risk : null;
+      a.trades.push(t);
+      delete a.open[order.inst];
+      t = null;
+    }
+    openQty -= closed;
+  }
+  if (!openQty) return;
+  if (!t) {
+    a.nextTradeId = a.nextTradeId || 1;
+    t = a.open[order.inst] = {
+      id: a.nextTradeId++, inst: order.inst, side: q > 0 ? 'buy' : 'sell', entryTime: time,
+      pnl: 0, fees: 0, exitQty: 0, exitValue: 0, risk: 0, maxQty: 0, sl: null, tp: null, note: '',
+    };
+  }
+  t.fees += openQty * perFee;
+  t.entry = avg;
+  t.maxQty = Math.max(t.maxQty, Math.abs(newQty));
+  if (order.slPts) t.risk += order.slPts * openQty * spec.pointValue; // 1R = planned stop distance
 }
 
 // Apply one execution to the account (mutates `a`).
@@ -74,8 +115,9 @@ function execute(a, order, price, time) {
   if (!pos.qty || sgn(newQty) !== sgn(pos.qty)) avg = price; // opened or flipped
   else if (Math.abs(newQty) > Math.abs(pos.qty)) avg = (pos.avg * pos.qty + price * q) / newQty;
 
-  const fee = Math.abs(q) * spec.fee;
+  const fee = Math.abs(q) * feeFor(a, order.inst);
   a.balance += pnl - fee;
+  trackTrade(a, order, pos, q, newQty, avg, price, time, pnl, fee);
   if (newQty) a.positions[order.inst] = { qty: newQty, avg };
   else delete a.positions[order.inst];
 
@@ -100,9 +142,13 @@ function execute(a, order, price, time) {
     const dir = order.side === 'buy' ? 1 : -1;
     const exitSide = order.side === 'buy' ? 'sell' : 'buy';
     const base = { inst: order.inst, side: exitSide, qty: Math.abs(q), reduceOnly: true, oco: order.id, status: 'open', parent: order.id };
+    const ot = a.open && a.open[order.inst];
     if (order.tpPts) {
-      a.orders.push({ ...base, id: a.nextId++, type: 'limit', label: 'TP', price: roundTick(price + dir * order.tpPts, spec.tick) });
+      const tp = roundTick(price + dir * order.tpPts, spec.tick);
+      a.orders.push({ ...base, id: a.nextId++, type: 'limit', label: 'TP', price: tp });
+      if (ot && ot.tp == null) ot.tp = tp;
     }
+    if (order.slPts && ot && ot.sl == null) ot.sl = roundTick(price - dir * order.slPts, spec.tick);
     if (order.slPts) {
       a.orders.push(order.slTrail
         ? { ...base, id: a.nextId++, type: 'trail', label: 'SL (trail)', trail: order.slPts, stop: roundTick(price - dir * order.slPts, spec.tick) }
@@ -142,9 +188,15 @@ function liquidateAll(a, time) {
 }
 
 // Track the equity high-water mark; breach -> flatten everything and lock.
+// The daily loss limit works the same way off the session's opening equity.
 function checkDrawdown(a, time) {
   const eq = equity(a);
   if (eq > a.peak) a.peak = eq;
+  if (a.dailyLimit && !a.dayLocked && eq <= a.dayStart - a.dailyLimit) {
+    liquidateAll(a, time);
+    a.dayLocked = true;
+    return true;
+  }
   const th = ddThreshold(a);
   if (!a.breached && th != null && eq <= th) {
     liquidateAll(a, time);
@@ -159,6 +211,11 @@ export function processBar(acct, root, bar) {
   const a = clone(acct);
   const path = (bar.o - bar.l) < (bar.h - bar.o) ? [bar.o, bar.l, bar.h, bar.c] : [bar.o, bar.h, bar.l, bar.c];
   const mine = (o) => o.status === 'open' && INSTRUMENTS[o.inst].root === root;
+  if (bar.sess && bar.sess !== a.day) { // new trading session: reset the daily loss baseline
+    a.day = bar.sess;
+    a.dayStart = equity(a);
+    a.dayLocked = false;
+  }
 
   for (let i = 0; i < path.length - 1; i++) {
     const from = path[i], to = path[i + 1];
@@ -195,6 +252,7 @@ export function processBar(acct, root, bar) {
  */
 export function placeOrder(acct, order, time) {
   if (acct.breached) return { acct, error: 'Drawdown limit hit — reset the limit to keep trading.' };
+  if (acct.dayLocked) return { acct, error: 'Daily loss limit hit — trading resumes next session (18:00 ET).' };
   const spec = INSTRUMENTS[order.inst];
   const px = acct.last[spec.root];
   if (px == null) return { acct, error: 'No price yet — start the replay first.' };
@@ -241,6 +299,33 @@ export function setDrawdownLimit(acct, ddLimit) {
   a.ddLimit = ddLimit > 0 ? ddLimit : null;
   a.peak = equity(a);
   a.breached = false;
+  return a;
+}
+
+export function setDailyLimit(acct, dailyLimit) {
+  const a = clone(acct);
+  a.dailyLimit = dailyLimit > 0 ? dailyLimit : null;
+  a.dayLocked = false; // re-checked on the next bar against the new limit
+  return a;
+}
+
+export function setFee(acct, inst, fee) {
+  const a = clone(acct);
+  a.fees = { ...(a.fees || {}), [inst]: fee >= 0 ? fee : INSTRUMENTS[inst].fee };
+  return a;
+}
+
+// Move a working order (dragged on the chart). field: 'price' | 'stop'.
+export function modifyOrder(acct, id, field, value) {
+  const a = clone(acct);
+  const o = a.orders.find(x => x.id === id);
+  if (o && value > 0) o[field] = roundTick(value, INSTRUMENTS[o.inst].tick);
+  return a;
+}
+
+export function updateTrade(acct, id, patch) {
+  const a = clone(acct);
+  a.trades = (a.trades || []).map(t => (t.id === id ? { ...t, ...patch } : t));
   return a;
 }
 

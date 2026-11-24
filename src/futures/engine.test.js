@@ -1,5 +1,6 @@
 import {
   newAccount, placeOrder, processBar, closePosition, setDrawdownLimit, resetDrawdown, equity,
+  setDailyLimit, modifyOrder, setFee,
 } from './engine';
 
 const bar = (t, o, h, l, c) => ({ t, o, h, l, c });
@@ -69,4 +70,42 @@ test('closing a position cancels its brackets', () => {
   acct = closePosition(acct, 'ES', 2);
   expect(acct.orders).toHaveLength(0);
   expect(acct.positions.ES).toBeUndefined();
+});
+
+test('round trip is journaled with net P&L and R-multiple', () => {
+  let { acct } = placeOrder(seed(), { inst: 'MES', side: 'buy', qty: 2, type: 'market', tpPts: 10, slPts: 5 }, 1);
+  acct = processBar(acct, 'ES', bar(2, 5001, 5012, 5000, 5011));
+  const [t] = acct.trades;
+  expect(t).toMatchObject({ inst: 'MES', side: 'buy', entry: 5000, exit: 5010, sl: 4995, tp: 5010, maxQty: 2 });
+  expect(t.net).toBeCloseTo(10 * 5 * 2 - 4 * 0.62);
+  expect(t.r).toBeCloseTo(t.net / (5 * 5 * 2));
+});
+
+test('flip closes one trade and opens another', () => {
+  let { acct } = placeOrder(seed(), { inst: 'ES', side: 'buy', qty: 1, type: 'market' }, 1);
+  ({ acct } = placeOrder(acct, { inst: 'ES', side: 'sell', qty: 2, type: 'market' }, 2));
+  expect(acct.trades).toHaveLength(1);
+  expect(acct.open.ES).toMatchObject({ side: 'sell', entry: 5000 });
+  expect(acct.trades[0].r).toBeNull();
+});
+
+test('daily loss limit locks for the session and unlocks next session', () => {
+  let acct = setDailyLimit(processBar(newAccount(), 'ES', { t: 0, o: 5000, h: 5000, l: 5000, c: 5000, sess: 'd1' }), 500);
+  ({ acct } = placeOrder(acct, { inst: 'ES', side: 'buy', qty: 1, type: 'market' }, 1));
+  acct = processBar(acct, 'ES', { t: 2, o: 5000, h: 5000, l: 4985, c: 4986, sess: 'd1' });
+  expect(acct.dayLocked).toBe(true);
+  expect(acct.positions.ES).toBeUndefined();
+  expect(placeOrder(acct, { inst: 'ES', side: 'buy', qty: 1, type: 'market' }, 3).error).toMatch(/Daily/);
+  acct = processBar(acct, 'ES', { t: 3, o: 4986, h: 4987, l: 4985, c: 4986, sess: 'd2' });
+  expect(acct.dayLocked).toBe(false);
+});
+
+test('dragging an order moves it to the tick grid; custom fees apply', () => {
+  let acct = setFee(seed(), 'ES', 1);
+  ({ acct } = placeOrder(acct, { inst: 'ES', side: 'buy', qty: 1, type: 'limit', price: 4990 }, 1));
+  acct = modifyOrder(acct, acct.orders[0].id, 'price', 4995.1);
+  expect(acct.orders[0].price).toBe(4995);
+  acct = processBar(acct, 'ES', bar(2, 4999, 4999, 4994, 4996));
+  expect(acct.positions.ES.avg).toBe(4995);
+  expect(acct.balance).toBe(25000 - 1);
 });
