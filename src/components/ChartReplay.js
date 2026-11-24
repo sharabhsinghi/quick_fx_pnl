@@ -42,15 +42,16 @@ const toSec = (ms) => Math.floor(ms / 1000);
  * every replay step (setData keeps the user's current view unless it no
  * longer fits the data).
  */
-const ReplayChart = forwardRef(function ReplayChart(
+export const ReplayChart = forwardRef(function ReplayChart(
   {
     candles, emaLines, vwap, showVolume, width, isDaily, colorFor,
     drawings, activeTool, onCommitDrawing, onUpdateDrawing,
+    height = 420, rsi = null, priceLines = null,
   }, ref,
 ) {
   const containerRef = useRef(null);
   const chartRef = useRef(null);
-  const seriesRef = useRef({ candle: null, volume: null, vwap: null, ema: new Map(), colors: {}, drawPrimitive: null });
+  const seriesRef = useRef({ candle: null, volume: null, vwap: null, rsi: null, ema: new Map(), colors: {}, drawPrimitive: null, priceLines: [] });
   const lookupRef = useRef(new Map()); // time (sec) -> { bar, vwapVal, emaVals }
   const isDailyRef = useRef(isDaily);
   const candlesRef = useRef(candles);
@@ -92,7 +93,7 @@ const ReplayChart = forwardRef(function ReplayChart(
 
     const chart = createChart(containerRef.current, {
       width,
-      height: 420,
+      height,
       layout: { background: { type: ColorType.Solid, color: 'transparent' }, textColor: col('--text-muted') },
       grid: { vertLines: { color: col('--border') }, horzLines: { color: col('--border') } },
       rightPriceScale: { borderColor: col('--border') },
@@ -120,7 +121,7 @@ const ReplayChart = forwardRef(function ReplayChart(
       wickUpColor: col('--green'), wickDownColor: col('--red'),
     });
 
-    const drawPrimitive = new DrawingsPrimitive({ trend: col('--blue'), ray: '#b388ff', fib: col('--amber') });
+    const drawPrimitive = new DrawingsPrimitive({ trend: col('--blue'), ray: '#b388ff', fib: col('--amber'), hline: '#26c6da' });
     seriesRef.current.candle.attachPrimitive(drawPrimitive);
     seriesRef.current.drawPrimitive = drawPrimitive;
 
@@ -131,7 +132,7 @@ const ReplayChart = forwardRef(function ReplayChart(
       if (!tool || !param.point) return;
       const pt = resolvePoint(param.point);
       if (!pt) return;
-      if (tool === 'ray') {
+      if (tool === 'ray' || tool === 'hline') {
         onCommitRef.current && onCommitRef.current({ tool, t1: pt.time, p1: pt.price });
         return;
       }
@@ -146,7 +147,7 @@ const ReplayChart = forwardRef(function ReplayChart(
       setLegend((param && param.time && lookupRef.current.get(param.time)) || null);
 
       const tool = activeToolRef.current;
-      if (tool && tool !== 'ray' && pendingRef.current && param && param.point) {
+      if (tool && tool !== 'ray' && tool !== 'hline' && pendingRef.current && param && param.point) {
         const pt = resolvePoint(param.point);
         if (pt) {
           drawPrimitive.setPreview({
@@ -168,7 +169,7 @@ const ReplayChart = forwardRef(function ReplayChart(
     return () => {
       chart.remove();
       chartRef.current = null;
-      seriesRef.current = { candle: null, volume: null, vwap: null, ema: new Map(), colors: seriesRef.current.colors, drawPrimitive: null };
+      seriesRef.current = { candle: null, volume: null, vwap: null, rsi: null, ema: new Map(), colors: seriesRef.current.colors, drawPrimitive: null, priceLines: [] };
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -234,7 +235,7 @@ const ReplayChart = forwardRef(function ReplayChart(
       if (part === 'body') {
         const dt = pt.time - start.time, dp = pt.price - start.price;
         next = { ...orig, t1: orig.t1 + dt, p1: orig.p1 + dp };
-        if (orig.tool !== 'ray') { next.t2 = orig.t2 + dt; next.p2 = orig.p2 + dp; }
+        if (orig.t2 !== undefined) { next.t2 = orig.t2 + dt; next.p2 = orig.p2 + dp; }
       } else if (part === 'p1') {
         next = { ...orig, t1: pt.time, p1: pt.price };
       } else {
@@ -276,6 +277,36 @@ const ReplayChart = forwardRef(function ReplayChart(
       seriesRef.current.volume = null;
     }
   }, [showVolume]);
+
+  // RSI in its own pane below price (lightweight-charts v5 panes), with 70/30 guides.
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    if (rsi && !seriesRef.current.rsi) {
+      const s = chart.addSeries(LineSeries, {
+        color: '#b388ff', lineWidth: 1, priceLineVisible: false,
+        autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 100 } }),
+      }, 1);
+      [70, 30].forEach(price => s.createPriceLine({ price, color: seriesRef.current.colors.amber, lineWidth: 1, lineStyle: 2, axisLabelVisible: false }));
+      chart.panes()[1] && chart.panes()[1].setHeight(110);
+      seriesRef.current.rsi = s;
+    } else if (!rsi && seriesRef.current.rsi) {
+      chart.removeSeries(seriesRef.current.rsi);
+      seriesRef.current.rsi = null;
+      if (chart.panes()[1]) chart.removePane(1);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!rsi]);
+
+  // Order / position markers as price lines on the candle series.
+  useEffect(() => {
+    const s = seriesRef.current.candle;
+    if (!s) return;
+    seriesRef.current.priceLines.forEach(l => s.removePriceLine(l));
+    seriesRef.current.priceLines = (priceLines || []).map(l => s.createPriceLine({
+      price: l.price, color: l.color, title: l.title, lineWidth: 1, lineStyle: l.dashed ? 2 : 0, axisLabelVisible: true,
+    }));
+  }, [priceLines]);
 
   // Add/remove the VWAP line to match the toggle.
   useEffect(() => {
@@ -337,13 +368,17 @@ const ReplayChart = forwardRef(function ReplayChart(
       seriesRef.current.vwap.setData(
         candles.map((b, i) => (vwap[i] == null ? null : { time: toSec(b.t), value: vwap[i] })).filter(Boolean));
     }
+    if (seriesRef.current.rsi && rsi) {
+      seriesRef.current.rsi.setData(
+        candles.map((b, i) => (rsi[i] == null ? null : { time: toSec(b.t), value: rsi[i] })).filter(Boolean));
+    }
     emaLines.forEach(({ period, values }) => {
       const s = seriesRef.current.ema.get(period);
       if (!s) return;
       s.setData(
         candles.map((b, i) => (values[i] == null ? null : { time: toSec(b.t), value: values[i] })).filter(Boolean));
     });
-  }, [candles, emaLines, vwap, showVolume, emaKey]);
+  }, [candles, emaLines, vwap, rsi, showVolume, emaKey]);
 
   const last = candles[candles.length - 1];
   const fallback = last ? {

@@ -26,6 +26,10 @@ function distToSegment(px, py, x1, y1, x2, y2) {
 // `{ part: 'p1' | 'p2' | 'body' }` or null. Endpoints win over the body so a
 // handle near the line itself still grabs the handle, not the whole shape.
 export function hitTestDrawing(timeScale, series, pt, d) {
+  if (d.tool === 'hline') {
+    const y = series.priceToCoordinate(d.p1);
+    return y !== null && Math.abs(pt.y - y) <= LINE_HIT_R ? { part: 'body' } : null;
+  }
   const x1 = timeScale.timeToCoordinate(d.t1);
   const y1 = series.priceToCoordinate(d.p1);
   if (x1 === null || y1 === null) return null;
@@ -103,6 +107,19 @@ export class DrawingsPrimitive {
   }
 
   _drawOne(ctx, ts, series, mediaSize, d) {
+    if (d.tool === 'hline') {
+      const y = series.priceToCoordinate(d.p1);
+      if (y === null) return;
+      ctx.save();
+      ctx.strokeStyle = this._colors.hline || this._colors.ray;
+      ctx.lineWidth = 1.25;
+      if (d.preview) ctx.setLineDash([4, 3]);
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(mediaSize.width, y); ctx.stroke();
+      ctx.fillStyle = ctx.strokeStyle; ctx.font = FONT; ctx.textBaseline = 'bottom';
+      ctx.fillText(d.p1.toFixed(2), 4, y - 2);
+      ctx.restore();
+      return;
+    }
     const x1 = ts.timeToCoordinate(d.t1);
     const y1 = series.priceToCoordinate(d.p1);
     if (x1 === null || y1 === null) return;

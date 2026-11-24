@@ -3,10 +3,11 @@ import PipCalculator from './PipCalculator';
 import PLCalculator from './PLCalculator';
 import ChartReplay from './ChartReplay';
 import ORB from './ORB';
+import PracticeFutures from './PracticeFutures';
 import TradingWizardContainer from './TradingWizard';
 
 export default function Calculators({ trades, onOpen, onOpenForm, accountCurrency, accountSize, usdRate }) {
-  const [active, setActive] = useState(null); // null | 'pip' | 'pl' | 'replay' | 'orb' | 'wizard'
+  const [active, setActive] = useState(null); // null | 'pip' | 'pl' | 'replay' | 'orb' | 'futures' | 'wizard'
 
   const handleOpenTrade = (data) => {
     onOpen(data);
@@ -65,6 +66,16 @@ export default function Calculators({ trades, onOpen, onOpenForm, accountCurrenc
               <div className="calcs-card-cta">OPEN CALCULATOR →</div>
             </button>
 
+            <button className="calcs-card" onClick={() => setActive('futures')}>
+              <div className="calcs-card-icon">⇅</div>
+              <div className="calcs-card-name">PRACTICE FUTURES</div>
+              <div className="calcs-card-desc">
+                Replay ES, MES, NQ and MNQ minute by minute from any past moment and trade a simulated
+                $25,000 account with brackets, stops, trailing stops and a trailing drawdown limit.
+              </div>
+              <div className="calcs-card-cta">OPEN SIMULATOR →</div>
+            </button>
+
             <button className="calcs-card" onClick={() => setActive('wizard')}>
               <div className="calcs-card-icon">🧭</div>
               <div className="calcs-card-name">TRADING WIZARD</div>
@@ -116,6 +127,14 @@ export default function Calculators({ trades, onOpen, onOpenForm, accountCurrenc
         </div>
       )}
       
+      {/* ── Practice Futures — inline ── */}
+      {active === 'futures' && (
+        <div className="calcs-pl-wrap">
+          <button className="calcs-back-btn" onClick={() => setActive(null)}>← BACK TO CALCULATORS</button>
+          <PracticeFutures />
+        </div>
+      )}
+
       {/* ── Trading Wizard — inline ── */}
       {active === 'wizard' && (
         <div className="calcs-pl-wrap">
